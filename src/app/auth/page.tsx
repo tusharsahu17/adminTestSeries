@@ -21,7 +21,7 @@ function AuthContent() {
     e.preventDefault();
     const resultAction = await dispatch(loginUser({ username, password }));
     if (loginUser.fulfilled.match(resultAction)) {
-      router.push('/dashboard');
+      router.push('/admin');
     }
   };
 

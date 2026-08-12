@@ -1,3 +1,4 @@
+import './admin.css';
 import Link from 'next/link';
 
 export default function AdminLayout({
@@ -6,44 +7,41 @@ export default function AdminLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="flex h-screen bg-slate-50">
-      {/* Admin Sidebar */}
-      <aside className="w-64 bg-slate-900 text-white flex flex-col shadow-lg">
-        <div className="p-6 text-xl font-bold tracking-wider border-b border-slate-700">
-          ADMIN PANEL
-        </div>
-        
-        <nav className="flex-1 p-4 space-y-2 font-medium">
-          <Link 
-            href="/admin" 
-            className="block px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors"
-          >
-            Dashboard
-          </Link>
-          <Link 
-            href="/admin/users" 
-            className="block px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors"
-          >
-            Manage Users
-          </Link>
-          
-          <div className="pt-8 mt-8 border-t border-slate-700">
-            <Link 
-              href="/dashboard" 
-              className="block px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            >
-              ← Back to App
-            </Link>
+    <div className="admin-theme">
+      <div className="app">
+        <aside className="sidebar">
+          <div className="brand">
+            <div className="brand-icon">T</div>
+            <span>Test Series</span>
           </div>
-        </nav>
-      </aside>
 
-      {/* Main Admin Content */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        <div className="max-w-6xl mx-auto">
+          <nav className="nav">
+            <div className="section-label">Overview</div>
+            <Link className="active" href="/admin"><span className="icon">⌂</span><span>Dashboard</span></Link>
+
+            <div className="section-label">Management</div>
+            <Link href="/admin/users"><span className="icon">👥</span><span>Users</span></Link>
+            <Link href="/admin/test-series"><span className="icon">▣</span><span>Test Series</span></Link>
+            <Link href="/admin/tests"><span className="icon">📝</span><span>Tests</span></Link>
+            <Link href="/admin/questions"><span className="icon">❓</span><span>Question Bank</span></Link>
+            <Link href="/admin/subjects"><span className="icon">📚</span><span>Subjects</span></Link>
+            <Link href="/admin/results"><span className="icon">📊</span><span>Results</span></Link>
+
+            <div className="section-label">Business</div>
+            <Link href="/admin/payments"><span className="icon">💳</span><span>Payments</span></Link>
+            <Link href="/admin/coupons"><span className="icon">🎟</span><span>Coupons</span></Link>
+            <Link href="/admin/notifications"><span className="icon">🔔</span><span>Notifications</span></Link>
+
+            <div className="section-label">System</div>
+            <Link href="/admin/analytics"><span className="icon">📈</span><span>Analytics</span></Link>
+            <Link href="/admin/settings"><span className="icon">⚙</span><span>Settings</span></Link>
+          </nav>
+        </aside>
+
+        <main className="main">
           {children}
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

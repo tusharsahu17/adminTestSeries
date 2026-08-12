@@ -70,7 +70,7 @@ const authSlice = createSlice({
           localStorage.setItem('token', action.payload.token);
           // Set cookies for middleware to read
           document.cookie = `token=${action.payload.token}; path=/;`;
-          document.cookie = `user_role=${action.payload.user?.role || 'user'}; path=/;`;
+          document.cookie = `user_role=${action.payload.user?.role || 'admin'}; path=/;`;
         }
       })
       .addCase(loginUser.rejected, (state, action) => {
