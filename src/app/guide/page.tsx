@@ -8,7 +8,7 @@ export default function GuidePage() {
         .guide-wrapper { box-sizing:border-box; font-family:Arial,sans-serif; background:#f5f7fb; color:#172033; line-height:1.6; }
         .guide-wrapper * { box-sizing:border-box; }
         .guide-layout { display:flex; min-height:100vh; }
-        .guide-side { width:240px; background:#111827; color:#fff; padding:22px 14px; position:fixed; inset:0 auto 0 0; z-index: 50; }
+        .guide-side { width:240px; background:#111827; color:#fff; padding:22px 14px; position:fixed; inset:0 auto 0 0; z-index: 50; overflow-y: auto; }
         .guide-side h2 { padding:0 10px; }
         .guide-side a { display:block; color:#cbd5e1; text-decoration:none; padding:9px 10px; border-radius:7px; }
         .guide-side a:hover { background:#1f2937; color:#fff; }
