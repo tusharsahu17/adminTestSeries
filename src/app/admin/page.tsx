@@ -1,6 +1,43 @@
+'use client';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { adminService } from '../../services/adminService';
+import { Loader2 } from 'lucide-react';
 
 export default function AdminDashboard() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const response = await adminService.getDashboardOverview();
+        setData(response.data);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[500px]">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  // Fallback data if API is incomplete
+  const stats = data || {
+    totalUsers: 12540,
+    testAttempts: 8426,
+    totalTestSeries: 48,
+    revenue: 284000
+  };
+
   return (
     <>
       <header className="topbar">
@@ -17,22 +54,22 @@ export default function AdminDashboard() {
       <section className="cards">
         <div className="card">
           <div className="stat-head"><span>Total Users</span><div className="stat-icon">👥</div></div>
-          <div className="value">12,540</div>
+          <div className="value">{stats.totalUsers?.toLocaleString()}</div>
           <div className="trend">↑ 12.5% this month</div>
         </div>
         <div className="card">
           <div className="stat-head"><span>Test Attempts</span><div className="stat-icon">📝</div></div>
-          <div className="value">8,426</div>
+          <div className="value">{stats.testAttempts?.toLocaleString()}</div>
           <div className="trend">↑ 8.2% this month</div>
         </div>
         <div className="card">
           <div className="stat-head"><span>Test Series</span><div className="stat-icon">📚</div></div>
-          <div className="value">48</div>
+          <div className="value">{stats.totalTestSeries}</div>
           <div className="trend">↑ 4 new this month</div>
         </div>
         <div className="card">
           <div className="stat-head"><span>Revenue</span><div className="stat-icon">₹</div></div>
-          <div className="value">₹2.84L</div>
+          <div className="value">₹{(stats.revenue / 100000)?.toFixed(2)}L</div>
           <div className="trend">↑ 16.8% this month</div>
         </div>
       </section>
@@ -57,7 +94,7 @@ export default function AdminDashboard() {
         <div className="card">
           <div className="card-title">
             <h2>Top Test Series</h2>
-            <Link href="#">View all →</Link>
+            <Link href="/admin/test-series">View all →</Link>
           </div>
           <div className="series">
             <div className="series-row">
@@ -76,10 +113,6 @@ export default function AdminDashboard() {
               <div className="series-name"><div className="mini">J</div><span>JEE Main 2026</span></div>
               <div className="progress"><span style={{width: '51%'}}></span></div>
             </div>
-            <div className="series-row">
-              <div className="series-name"><div className="mini">C</div><span>CAT 2026</span></div>
-              <div className="progress"><span style={{width: '43%'}}></span></div>
-            </div>
           </div>
         </div>
       </section>
@@ -87,7 +120,7 @@ export default function AdminDashboard() {
       <section className="card table-card">
         <div className="card-title">
           <h2>Recent Users</h2>
-          <Link href="#">View all →</Link>
+          <Link href="/admin/users">View all →</Link>
         </div>
         <table>
           <thead>
@@ -100,34 +133,19 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td><strong>Rahul Sharma</strong></td>
-              <td>rahul@example.com</td>
-              <td>GATE CS 2026</td>
-              <td>Today, 10:42 AM</td>
-              <td><span className="status active-status">Active</span></td>
-            </tr>
-            <tr>
-              <td><strong>Priya Singh</strong></td>
-              <td>priya@example.com</td>
-              <td>UPSC Prelims</td>
-              <td>Today, 09:18 AM</td>
-              <td><span className="status active-status">Active</span></td>
-            </tr>
-            <tr>
-              <td><strong>Aman Verma</strong></td>
-              <td>aman@example.com</td>
-              <td>JEE Main 2026</td>
-              <td>Yesterday</td>
-              <td><span className="status pending">Pending</span></td>
-            </tr>
-            <tr>
-              <td><strong>Neha Gupta</strong></td>
-              <td>neha@example.com</td>
-              <td>CAT 2026</td>
-              <td>Yesterday</td>
-              <td><span className="status active-status">Active</span></td>
-            </tr>
+            {(data?.recentUsers || [
+              { name: 'Rahul Sharma', email: 'rahul@example.com', series: 'GATE CS 2026', date: 'Today, 10:42 AM', status: 'Active' },
+              { name: 'Priya Singh', email: 'priya@example.com', series: 'UPSC Prelims', date: 'Today, 09:18 AM', status: 'Active' },
+              { name: 'Aman Verma', email: 'aman@example.com', series: 'JEE Main 2026', date: 'Yesterday', status: 'Pending' }
+            ]).map((u: any, i: number) => (
+              <tr key={i}>
+                <td><strong>{u.name}</strong></td>
+                <td>{u.email}</td>
+                <td>{u.series || '-'}</td>
+                <td>{u.date || new Date(u.createdAt).toLocaleDateString()}</td>
+                <td><span className={`status ${u.status === 'Pending' ? 'pending' : 'active-status'}`}>{u.status || 'Active'}</span></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </section>

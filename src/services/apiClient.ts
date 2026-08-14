@@ -26,18 +26,53 @@ apiClient.interceptors.request.use(
 );
 
 export const getData = async (url: string, params = {}) => {
-  const response = await apiClient.get(url, { params });
-  return response.data;
+  try {
+    const response = await apiClient.get(url, { params });
+    return response.data;
+  } catch (error: any) {
+    console.error(`GET ${url} failed:`, error.response?.data || error.message);
+    throw error;
+  }
 };
 
 export const postData = async (url: string, data = {}) => {
-  const response = await apiClient.post(url, data);
-  return response.data;
+  try {
+    const response = await apiClient.post(url, data);
+    return response.data;
+  } catch (error: any) {
+    console.error(`POST ${url} failed:`, error.response?.data || error.message);
+    throw error;
+  }
 };
 
 export const putData = async (url: string, data = {}) => {
-  const response = await apiClient.put(url, data);
-  return response.data;
+  try {
+    const response = await apiClient.put(url, data);
+    return response.data;
+  } catch (error: any) {
+    console.error(`PUT ${url} failed:`, error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const patchData = async (url: string, data = {}) => {
+  try {
+    const response = await apiClient.patch(url, data);
+    return response.data;
+  } catch (error: any) {
+    console.error(`PATCH ${url} failed:`, error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const deleteData = async (url: string) => {
+  try {
+    const response = await apiClient.delete(url);
+    return response.data;
+  } catch (error: any) {
+    console.error(`DELETE ${url} failed:`, error.response?.data || error.message);
+    throw error;
+  }
 };
 
 export default apiClient;
