@@ -30,18 +30,7 @@ export const adminService = {
   
   // Subjects & Hierarchy
   getSubjects: async () => {
-    try {
-      return await getData('/api/subjects');
-    } catch (err) {
-      console.warn("API /api/subjects not found. Returning mock subjects.");
-      return {
-        data: [
-          { id: '1', name: 'Mathematics' },
-          { id: '2', name: 'Science' },
-          { id: '3', name: 'History' }
-        ]
-      };
-    }
+    return await getData('/api/subjects');
   },
   createSubject: async (data: any) => {
     return await postData('/api/subjects', data);
@@ -69,10 +58,37 @@ export const adminService = {
   getSubtopics: async (topicId: string) => {
     return await getData(`/api/admin/hierarchy/topics/${topicId}/subtopics`);
   },
+
+  // Exams
+  getExams: async () => {
+    return await getData('/api/exams');
+  },
+  createExam: async (data: any) => {
+    return await postData('/api/exams', data);
+  },
+  updateExam: async (id: string, data: any) => {
+    return await putData(`/api/exams/${id}`, data);
+  },
+  deleteExam: async (id: string) => {
+    return await deleteData(`/api/exams/${id}`);
+  },
+  
+  getExamSubjects: async (examId: string) => {
+    return await getData(`/api/exams/${examId}/subjects`);
+  },
+  addExamSubject: async (examId: string, subjectId: string) => {
+    return await postData(`/api/exams/${examId}/subjects`, { subjectId });
+  },
+  removeExamSubject: async (examId: string, subjectId: string) => {
+    return await deleteData(`/api/exams/${examId}/subjects/${subjectId}`);
+  },
   
   // Test Series
   getTestSeries: async (params?: any) => {
     return await getData('/api/admin/test-series', params);
+  },
+  getSeriesDetails: async (id: string) => {
+    return await getData(`/api/admin/test-series/${id}`);
   },
   createTestSeries: async (data: any) => {
     return await postData('/api/admin/test-series', data);
@@ -82,6 +98,15 @@ export const adminService = {
   },
   deleteTestSeries: async (id: string) => {
     return await deleteData(`/api/admin/test-series/${id}`);
+  },
+  addTestToSeries: async (id: string, testId: string, order: number) => {
+    return await postData(`/api/admin/test-series/${id}/tests`, { test_id: testId, order });
+  },
+  reorderTestSeriesTests: async (id: string, orderedTestIds: number[]) => {
+    return await putData(`/api/admin/test-series/${id}/tests/reorder`, { ordered_test_ids: orderedTestIds });
+  },
+  syncSeriesTests: async (id: string, testIds: number[]) => {
+    return await putData(`/api/admin/test-series/${id}/tests/sync`, { test_ids: testIds });
   },
 
   // Categories

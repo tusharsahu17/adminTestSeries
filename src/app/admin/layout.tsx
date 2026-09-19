@@ -22,6 +22,7 @@ export default function AdminLayout({
             <div className="section-label">Management</div>
             <Link href="/admin/users"><span className="icon">👥</span><span>Users</span></Link>
             <Link href="/admin/categories"><span className="icon">📁</span><span>Categories</span></Link>
+            <Link href="/admin/exams"><span className="icon">📝</span><span>Exams</span></Link>
             <Link href="/admin/test-series"><span className="icon">▣</span><span>Test Series</span></Link>
             <Link href="/admin/tests"><span className="icon">📝</span><span>Tests</span></Link>
             <Link href="/admin/questions"><span className="icon">❓</span><span>Question Bank</span></Link>
@@ -37,6 +38,7 @@ export default function AdminLayout({
             <div className="section-label">System</div>
             <Link href="/admin/analytics"><span className="icon">📈</span><span>Analytics</span></Link>
             <Link href="/admin/settings"><span className="icon">⚙</span><span>Settings</span></Link>
+            <Link href="/flow"><span className="icon">🔄</span><span>App Flow</span></Link>
 
             <div className="section-label">Guide</div>
             <Link href="/guide" target="_blank"><span className="icon">📖</span><span>Admin Guide</span></Link>

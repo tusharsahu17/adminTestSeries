@@ -10,6 +10,7 @@ import {
   CheckCircle,
   XCircle,
   X,
+  Menu
 } from "lucide-react";
 import Link from "next/link";
 
@@ -24,6 +25,7 @@ export default function TestSeriesPage() {
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isAddTestOpen, setIsAddTestOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedSeriesId, setSelectedSeriesId] = useState<string | null>(null);
 
@@ -35,6 +37,13 @@ export default function TestSeriesPage() {
     is_free: false,
     is_published: false,
   });
+
+  const [testsInSeries, setTestsInSeries] = useState<any[]>([]);
+  const [availableTests, setAvailableTests] = useState<any[]>([]);
+  const [testSearchTerm, setTestSearchTerm] = useState("");
+  const [selectedTestsToAdd, setSelectedTestsToAdd] = useState<Set<string>>(new Set());
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+  const [loadingTests, setLoadingTests] = useState(false);
 
   const fetchSeries = async () => {
     setLoading(true);
@@ -67,6 +76,25 @@ export default function TestSeriesPage() {
     loadCategories();
   }, []);
 
+  const searchTests = async () => {
+    setLoadingTests(true);
+    try {
+      const res = await adminService.getTests({ search: testSearchTerm });
+      const data = res.data?.tests || res.data || res;
+      setAvailableTests(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch tests:", err);
+    } finally {
+      setLoadingTests(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAddTestOpen) {
+      searchTests();
+    }
+  }, [testSearchTerm, isAddTestOpen]);
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title) return alert("Title is required");
@@ -77,7 +105,14 @@ export default function TestSeriesPage() {
         category_id: parseInt(form.category_id as string) || null,
         is_paid: !form.is_free,
       };
-      await adminService.createTestSeries(payload);
+      const res = await adminService.createTestSeries(payload) as any;
+      const newSeriesId = res.seriesId || res.data?.seriesId;
+
+      if (newSeriesId && testsInSeries.length > 0) {
+        const testIds = testsInSeries.map(t => t.id || t.test_id);
+        await adminService.syncSeriesTests(newSeriesId, testIds);
+      }
+
       alert("Test Series created successfully!");
       setIsCreateOpen(false);
       resetForm();
@@ -101,6 +136,10 @@ export default function TestSeriesPage() {
         is_paid: !form.is_free,
       };
       await adminService.updateTestSeries(selectedSeriesId, payload);
+
+      const orderedIds = testsInSeries.map(t => t.id || t.test_id);
+      await adminService.syncSeriesTests(selectedSeriesId, orderedIds);
+
       alert("Test Series updated successfully!");
       setIsEditOpen(false);
       resetForm();
@@ -126,7 +165,7 @@ export default function TestSeriesPage() {
     }
   };
 
-  const openEditModal = (item: any) => {
+  const openEditModal = async (item: any) => {
     setSelectedSeriesId(item.id);
     setForm({
       title: item.title || "",
@@ -136,7 +175,17 @@ export default function TestSeriesPage() {
       is_free: !!item.is_free,
       is_published: !!item.is_published,
     });
+    setTestsInSeries([]);
     setIsEditOpen(true);
+    
+    try {
+      const res = await adminService.getSeriesDetails(item.id) as any;
+      if (res && res.tests) {
+        setTestsInSeries(res.tests.map((t: any) => ({...t, existing: true})));
+      }
+    } catch (err) {
+      console.error("Failed to fetch series details:", err);
+    }
   };
 
   const resetForm = () => {
@@ -149,6 +198,41 @@ export default function TestSeriesPage() {
       is_published: false,
     });
     setSelectedSeriesId(null);
+    setTestsInSeries([]);
+  };
+
+  const handleDragStart = (index: number) => setDraggedItemIndex(index);
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedItemIndex === null || draggedItemIndex === index) return;
+    const newTests = [...testsInSeries];
+    const dragged = newTests[draggedItemIndex];
+    newTests.splice(draggedItemIndex, 1);
+    newTests.splice(index, 0, dragged);
+    setDraggedItemIndex(index);
+    setTestsInSeries(newTests);
+  };
+  const handleDragEnd = () => setDraggedItemIndex(null);
+
+  const toggleTestSelection = (testId: string) => {
+    const newSelection = new Set(selectedTestsToAdd);
+    if (newSelection.has(testId)) {
+      newSelection.delete(testId);
+    } else {
+      newSelection.add(testId);
+    }
+    setSelectedTestsToAdd(newSelection);
+  };
+
+  const addSelectedTests = () => {
+    const testsToAdd = availableTests.filter(t => selectedTestsToAdd.has(t.id?.toString()));
+    const existingIds = new Set(testsInSeries.map(t => t.id?.toString()));
+    const uniqueTestsToAdd = testsToAdd.filter(t => !existingIds.has(t.id?.toString()));
+    
+    setTestsInSeries([...testsInSeries, ...uniqueTestsToAdd]);
+    setIsAddTestOpen(false);
+    setSelectedTestsToAdd(new Set());
+    setTestSearchTerm("");
   };
 
   return (
@@ -293,9 +377,9 @@ export default function TestSeriesPage() {
       </section>
 
       {/* Modal for Create/Edit Test Series */}
-      {(isCreateOpen || isEditOpen) && (
+      {(isCreateOpen || isEditOpen) && !isAddTestOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full p-6 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-bold text-gray-900">
                 {isEditOpen ? "Edit Test Series" : "Create New Test Series"}
@@ -375,7 +459,62 @@ export default function TestSeriesPage() {
                 </div>
               </div>
 
-              <div className="flex gap-6 pt-2">
+              {/* Tests in Series Section */}
+              <div className="pt-2">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Tests in Series
+                  </label>
+                </div>
+                {testsInSeries.length > 0 ? (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100 mb-3 bg-gray-50">
+                    {testsInSeries.map((test, index) => (
+                      <div
+                        key={test.id || index}
+                        draggable
+                        onDragStart={() => handleDragStart(index)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragEnd={handleDragEnd}
+                        className={`flex items-center gap-3 p-3 bg-white ${draggedItemIndex === index ? 'opacity-50 bg-gray-100' : ''} cursor-move`}
+                      >
+                        <Menu className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm font-medium text-gray-500 w-5">{index + 1}</span>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{test.title || test.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {test.subject_name || test.category_name || "Uncategorized"} • {test.total_questions || test.questions_count || 0} Questions • {test.duration || 60} mins
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newTests = [...testsInSeries];
+                            newTests.splice(index, 1);
+                            setTestsInSeries(newTests);
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-500 rounded"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 border-dashed rounded-lg p-6 text-center text-sm text-gray-500 mb-3">
+                    No tests added to this series yet.
+                  </div>
+                )}
+                
+                <button
+                  type="button"
+                  onClick={() => setIsAddTestOpen(true)}
+                  className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Add Test
+                </button>
+              </div>
+
+              <div className="flex gap-6 pt-4">
                 <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                   <input
                     type="checkbox"
@@ -425,6 +564,91 @@ export default function TestSeriesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Adding Tests to Series */}
+      {isAddTestOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-900">
+                Add Tests to Series
+              </h3>
+              <button
+                onClick={() => setIsAddTestOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="relative mb-4">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by test name..."
+                value={testSearchTerm}
+                onChange={(e) => setTestSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+            </div>
+
+            <div className="flex-1 overflow-y-auto mb-4 border border-gray-100 rounded-lg">
+              {loadingTests ? (
+                <div className="p-8 flex justify-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                </div>
+              ) : availableTests.length === 0 ? (
+                <div className="p-8 text-center text-sm text-gray-500">
+                  No tests found.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {availableTests.map((test) => {
+                    // check if already added
+                    const isAlreadyAdded = testsInSeries.some(t => t.id === test.id);
+                    return (
+                      <label key={test.id} className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-50 ${isAlreadyAdded ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        <input
+                          type="checkbox"
+                          disabled={isAlreadyAdded}
+                          checked={selectedTestsToAdd.has(test.id?.toString()) || isAlreadyAdded}
+                          onChange={() => toggleTestSelection(test.id?.toString())}
+                          className="mt-1 rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{test.title || test.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {test.subject_name || test.category_name || "Uncategorized"} • {test.total_questions || test.questions_count || 0} Questions • {test.duration || 60} mins
+                          </p>
+                          {isAlreadyAdded && <span className="text-[10px] text-indigo-600 font-medium">Already in series</span>}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 flex justify-end gap-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setIsAddTestOpen(false)}
+                className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={addSelectedTests}
+                disabled={selectedTestsToAdd.size === 0}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                Add Selected
+              </button>
+            </div>
           </div>
         </div>
       )}

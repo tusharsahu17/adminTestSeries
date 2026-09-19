@@ -1,7 +1,7 @@
 
 
 export const ENDPOINTS = {
-  AUTH_LOGIN: '/api/auth/login',
+  AUTH_LOGIN: '/api/admin/auth/login',
   AUTH_REGISTER: '/api/auth/register',
   QUIZZES: '/api/quizzes',
   EXAMS: '/api/exams',

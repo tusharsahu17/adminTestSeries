@@ -6,6 +6,7 @@ import Link from 'next/link';
 
 export default function TestsPage() {
   const [tests, setTests] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Search state
@@ -24,7 +25,9 @@ export default function TestsPage() {
     duration: 60,
     total_marks: 100,
     passing_marks: 33,
-    is_published: false
+    subject_id: '',
+    is_published: false,
+    questions_count: 0
   });
 
   const fetchTests = async () => {
@@ -40,16 +43,34 @@ export default function TestsPage() {
     }
   };
 
+  const fetchSubjects = async () => {
+    try {
+      const res = await adminService.getSubjects();
+      // res might be { subjects: [...] } from the API or { data: [...] } from mock
+      const data = res?.subjects || res?.data?.subjects || res?.data || res;
+      setSubjects(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to fetch subjects:', err);
+    }
+  };
+
   useEffect(() => {
     fetchTests();
+    fetchSubjects();
   }, [searchTerm]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title) return alert('Title is required');
+    if (!form.title || !form.subject_id) return alert('Title and Subject are required');
     setSubmitting(true);
     try {
-      const payload = { ...form, name: form.title };
+      const payload = { 
+        ...form, 
+        name: form.title,
+        subject_id: parseInt(form.subject_id, 10),
+        total_questions: form.questions_count,
+        duration_minutes: form.duration
+      };
       await adminService.createTest(payload);
       alert('Test created successfully!');
       setIsCreateOpen(false);
@@ -65,10 +86,16 @@ export default function TestsPage() {
 
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !selectedTestId) return alert('Title is required');
+    if (!form.title || !selectedTestId || !form.subject_id) return alert('Title and Subject are required');
     setSubmitting(true);
     try {
-      const payload = { ...form, name: form.title };
+      const payload = { 
+        ...form, 
+        name: form.title,
+        subject_id: parseInt(form.subject_id, 10),
+        total_questions: form.questions_count,
+        duration_minutes: form.duration
+      };
       await adminService.updateTest(selectedTestId, payload);
       alert('Test updated successfully!');
       setIsEditOpen(false);
@@ -99,10 +126,12 @@ export default function TestsPage() {
     setSelectedTestId(item.id);
     setForm({
       title: item.title || item.name || '',
-      duration: item.duration || 60,
+      duration: item.duration_minutes || item.duration || 60,
       total_marks: item.total_marks || 100,
       passing_marks: item.passing_marks || 33,
-      is_published: !!item.is_published
+      subject_id: item.subject_id || '',
+      is_published: !!item.is_published,
+      questions_count: item.total_questions || item.questions_count || 0
     });
     setIsEditOpen(true);
   };
@@ -118,7 +147,9 @@ export default function TestsPage() {
       duration: 60,
       total_marks: 100,
       passing_marks: 33,
-      is_published: false
+      subject_id: '',
+      is_published: false,
+      questions_count: 0
     });
     setSelectedTestId(null);
   };
@@ -183,17 +214,17 @@ export default function TestsPage() {
                         </div>
                         <div>
                           <p className="font-medium text-gray-900">{test.title || test.name}</p>
-                          <p className="text-xs text-gray-500">Passing: {test.passing_marks || 0}/{test.total_marks || 0}</p>
+                          <p className="text-xs text-gray-500">Passing: {test.passing_marks || 0}/{test.total_marks || 0} &bull; {test.total_questions || test.questions_count || 0} Questions</p>
                         </div>
                       </div>
                     </td>
                     <td className="py-3 px-5">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Clock className="w-4 h-4 text-gray-400" /> {test.duration || 60} mins
+                        <Clock className="w-4 h-4 text-gray-400" /> {test.duration_minutes || test.duration || 60} mins
                       </div>
                     </td>
                     <td className="py-3 px-5 text-sm font-medium text-gray-900">
-                      {test.questions_count || 0}
+                      {test.total_questions || test.questions_count || 0}
                     </td>
                     <td className="py-3 px-5">
                       {test.is_published ? (
@@ -252,7 +283,21 @@ export default function TestsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subject <span className="text-red-500">*</span></label>
+                <select 
+                  required
+                  value={form.subject_id} 
+                  onChange={e => setForm({...form, subject_id: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                >
+                  <option value="" disabled>Select a subject</option>
+                  {subjects.map((sub: any) => (
+                    <option key={sub.id} value={sub.id}>{sub.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Duration (m)</label>
                   <input 
@@ -260,6 +305,16 @@ export default function TestsPage() {
                     min="1"
                     value={form.duration} 
                     onChange={e => setForm({...form, duration: Number(e.target.value)})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">No. of Questions</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={form.questions_count} 
+                    onChange={e => setForm({...form, questions_count: Number(e.target.value)})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
@@ -333,7 +388,7 @@ export default function TestsPage() {
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Duration</p>
                   <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
-                    <Clock className="w-4 h-4 text-gray-400" /> {viewData.duration || 60} mins
+                    <Clock className="w-4 h-4 text-gray-400" /> {viewData.duration_minutes || viewData.duration || 60} mins
                   </p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
@@ -352,7 +407,7 @@ export default function TestsPage() {
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Questions</p>
-                  <p className="text-sm font-medium text-gray-900">{viewData.questions_count || 0}</p>
+                  <p className="text-sm font-medium text-gray-900">{viewData.total_questions || viewData.questions_count || 0}</p>
                 </div>
               </div>
             </div>
