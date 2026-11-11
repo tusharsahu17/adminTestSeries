@@ -341,9 +341,16 @@ export default function TestSeriesPage() {
                     </td>
                     <td className="py-3 px-5">
                       {item.is_published ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          <CheckCircle className="w-3 h-3" /> Published
-                        </span>
+                        <div>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <CheckCircle className="w-3 h-3" /> Published
+                          </span>
+                          {(item.published_at || item.publishedAt) && (
+                            <p className="text-[11px] text-gray-500 mt-1">
+                              {new Date(item.published_at || item.publishedAt).toLocaleDateString('en-IN')}
+                            </p>
+                          )}
+                        </div>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                           <XCircle className="w-3 h-3" /> Draft

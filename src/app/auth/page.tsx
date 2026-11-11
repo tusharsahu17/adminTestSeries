@@ -1,15 +1,15 @@
-'use client';
-import { useState, Suspense } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { loginUser, selectAuthLoading, selectAuthError } from './authSlice';
-import { AppDispatch } from '../../store/store';
-import { useRouter } from 'next/navigation';
-import './auth.css';
-import { Loader2 } from 'lucide-react';
+"use client";
+import { useState, Suspense } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { loginUser, selectAuthLoading, selectAuthError } from "./authSlice";
+import { AppDispatch } from "../../store/store";
+import { useRouter } from "next/navigation";
+import "./auth.css";
+import { Loader2 } from "lucide-react";
 
 function AuthContent() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
   const dispatch = useDispatch<AppDispatch>();
   const isLoading = useSelector(selectAuthLoading);
@@ -17,11 +17,11 @@ function AuthContent() {
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
-    console.log('========>',username, password);
+    console.log("========>", username, password);
     e.preventDefault();
     const resultAction = await dispatch(loginUser({ username, password }));
     if (loginUser.fulfilled.match(resultAction)) {
-      router.push('/admin');
+      router.push("/admin");
     }
   };
 
@@ -35,7 +35,6 @@ function AuthContent() {
 
       <main className="auth-page-container">
         <div className="auth-wrapper">
-          
           {/* LEFT PANEL */}
           <section className="auth-left-panel">
             <div>
@@ -46,10 +45,13 @@ function AuthContent() {
 
               <div className="auth-hero-content">
                 <h1>
-                  Learn smarter.<br /><span>Test better.</span>
+                  Learn smarter.
+                  <br />
+                  <span>Test better.</span>
                 </h1>
                 <p>
-                  Challenge yourself with curated tests, track your performance and improve your knowledge every day.
+                  Challenge yourself with curated tests, track your performance
+                  and improve your knowledge every day.
                 </p>
 
                 <div className="auth-stats">
@@ -81,7 +83,7 @@ function AuthContent() {
               </div>
             </div>
 
-            <div style={{ color: '#64748b', fontSize: '12px' }}>
+            <div style={{ color: "#64748b", fontSize: "12px" }}>
               © 2026 Quizly. Learn. Practice. Achieve.
             </div>
           </section>
@@ -89,9 +91,8 @@ function AuthContent() {
           {/* RIGHT PANEL */}
           <section className="auth-right-panel">
             <div className="auth-form-container">
-              
               <div className="auth-form-header">
-                <h2>Welcome back</h2>
+                <h2>Welcome back, Admin</h2>
                 <p>Sign in to continue your learning journey.</p>
               </div>
 
@@ -103,10 +104,7 @@ function AuthContent() {
               )}
 
               {/* LOGIN FORM */}
-              <form
-                className="auth-form active"
-                onSubmit={handleLogin}
-              >
+              <form className="auth-form active" onSubmit={handleLogin}>
                 <div className="auth-field">
                   <label>Username</label>
                   <div className="auth-input-wrapper">
@@ -139,10 +137,16 @@ function AuthContent() {
                   <label className="auth-remember">
                     <input type="checkbox" /> Remember me
                   </label>
-                  <a href="#" className="auth-forgot">Forgot password?</a>
+                  <a href="#" className="auth-forgot">
+                    Forgot password?
+                  </a>
                 </div>
 
-                <button className="auth-submit-btn flex justify-center items-center gap-2" type="submit" disabled={isLoading}>
+                <button
+                  className="auth-submit-btn flex justify-center items-center gap-2"
+                  type="submit"
+                  disabled={isLoading}
+                >
                   {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Sign In →
                 </button>
@@ -153,7 +157,6 @@ function AuthContent() {
                   Continue with Google
                 </button>
               </form>
-
             </div>
           </section>
         </div>
@@ -164,11 +167,13 @@ function AuthContent() {
 
 export default function AuthPage() {
   return (
-    <Suspense fallback={
-      <div className="flex h-screen w-full items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex h-screen w-full items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        </div>
+      }
+    >
       <AuthContent />
     </Suspense>
   );

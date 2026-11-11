@@ -1,9 +1,58 @@
 import { getData, postData, putData, patchData, deleteData } from './apiClient';
+import { analyticsService } from './admin/analyticsService';
+import { enrollmentService } from './admin/enrollmentService';
+import { paymentService } from './admin/paymentService';
+import { subscriptionService } from './admin/subscriptionService';
+import type {
+  DashboardQueryParams,
+  RevenueAnalyticsParams,
+  StudentAnalyticsParams,
+  TestAnalyticsParams,
+  TestSeriesPerformanceParams,
+} from '../types/admin/analytics';
+import type { CreateEnrollmentPayload, UpdateEnrollmentStatusPayload } from '../types/admin/enrollment';
+import type {
+  CreatePaymentPayload,
+  RefundPaymentPayload,
+  UpdatePaymentStatusPayload,
+} from '../types/admin/payment';
+import type {
+  CreateSubscriptionPayload,
+  UpdateSubscriptionStatusPayload,
+} from '../types/admin/subscription';
 
 export const adminService = {
-  getDashboardOverview: async () => {
-    return await getData('/api/admin/dashboard');
+  // Dashboard & Analytics
+  getDashboardOverview: async (params?: DashboardQueryParams) => {
+    return await getData('/api/admin/dashboard', params);
   },
+  getFullDashboard: (params?: DashboardQueryParams) => analyticsService.getFullDashboard(params),
+  getOverviewStats: () => analyticsService.getOverview(),
+  getStudentAnalytics: (params?: StudentAnalyticsParams) => analyticsService.getStudents(params),
+  getTestAnalytics: (params?: TestAnalyticsParams) => analyticsService.getTests(params),
+  getTestSeriesPerformance: (params?: TestSeriesPerformanceParams) =>
+    analyticsService.getTestSeries(params),
+  getRevenueAnalytics: (params?: RevenueAnalyticsParams) => analyticsService.getRevenue(params),
+  getStudentPerformanceAnalytics: () => analyticsService.getStudentPerformance(),
+
+  // Enrollments
+  getEnrollments: (params?: Record<string, unknown>) => enrollmentService.list(params),
+  createEnrollment: (data: CreateEnrollmentPayload) => enrollmentService.create(data),
+  updateEnrollmentStatus: (id: string | number, data: UpdateEnrollmentStatusPayload) =>
+    enrollmentService.updateStatus(id, data),
+
+  // Payments & Subscriptions
+  getPayments: (params?: Record<string, unknown>) => paymentService.list(params),
+  getPaymentById: (id: string | number) => paymentService.getById(id),
+  createPayment: (data: CreatePaymentPayload) => paymentService.create(data),
+  updatePaymentStatus: (id: string | number, data: UpdatePaymentStatusPayload) =>
+    paymentService.updateStatus(id, data),
+  refundPayment: (id: string | number, data?: RefundPaymentPayload) =>
+    paymentService.refund(id, data),
+  getSubscriptions: (params?: Record<string, unknown>) => subscriptionService.list(params),
+  createSubscription: (data: CreateSubscriptionPayload) => subscriptionService.create(data),
+  updateSubscriptionStatus: (id: string | number, data: UpdateSubscriptionStatusPayload) =>
+    subscriptionService.updateStatus(id, data),
   
   // Users
   getUsers: async (params?: any) => {

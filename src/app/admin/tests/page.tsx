@@ -227,7 +227,11 @@ export default function TestsPage() {
                       {test.total_questions || test.questions_count || 0}
                     </td>
                     <td className="py-3 px-5">
-                      {test.is_published ? (
+                      {String(test.status || '').toLowerCase() === 'scheduled' ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                          Scheduled
+                        </span>
+                      ) : test.is_published || String(test.status || '').toLowerCase() === 'published' ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                           Published
                         </span>

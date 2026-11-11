@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function testEndpoints() {
-  const baseUrl = 'http://localhost:5000';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:5001';
   const endpoints = [
     '/api/admin/dashboard',
     '/api/admin/users',

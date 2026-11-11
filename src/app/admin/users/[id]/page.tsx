@@ -4,6 +4,7 @@ import { adminService } from '../../../../services/adminService';
 import { useParams, useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft, Activity, Target, Clock, AlertCircle, X } from 'lucide-react';
 import Link from 'next/link';
+import { formatDateTime, formatDurationSeconds, getStatusBadgeClasses } from '../../../../utils/formatters';
 
 export default function UserDetailsPage() {
   const { id } = useParams();
@@ -143,10 +144,12 @@ export default function UserDetailsPage() {
             </div>
             
             <div className="pt-6 space-y-4">
-              <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Contact Info</h3>
+              <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Contact & Activity Info</h3>
               <div className="text-sm flex flex-col gap-2 text-gray-600">
                 <p><strong>Phone:</strong> {profile.phone || 'N/A'}</p>
                 <p><strong>Username:</strong> {profile.username}</p>
+                <p><strong>Last Login:</strong> {formatDateTime(profile.last_login_at || profile.lastLoginAt)}</p>
+                <p><strong>Last Active:</strong> {formatDateTime(profile.last_active_at || profile.lastActiveAt)}</p>
               </div>
               
               <div className="pt-4 flex flex-col gap-2">
@@ -193,7 +196,12 @@ export default function UserDetailsPage() {
                 <h3 className="font-medium text-gray-900">Last Active</h3>
               </div>
               <p className="text-sm font-bold mt-2">
-                {activity.length > 0 && activity[0].timestamp ? new Date(activity[0].timestamp).toLocaleDateString() : 'N/A'}
+                {formatDateTime(
+                  profile.last_active_at ||
+                    profile.lastActiveAt ||
+                    activity[0]?.created_at ||
+                    activity[0]?.timestamp
+                )}
               </p>
             </div>
           </div>
@@ -202,7 +210,7 @@ export default function UserDetailsPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center">
               <h3 className="font-bold text-gray-900">Recent Test Attempts</h3>
-              <Link href="#" className="text-sm text-indigo-600 hover:underline">View All</Link>
+              <Link href="/admin/results" className="text-sm text-indigo-600 hover:underline">View Results →</Link>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
@@ -210,6 +218,7 @@ export default function UserDetailsPage() {
                   <tr>
                     <th className="py-3 px-5 font-medium">Test Name</th>
                     <th className="py-3 px-5 font-medium">Date</th>
+                    <th className="py-3 px-5 font-medium">Time Taken</th>
                     <th className="py-3 px-5 font-medium">Score</th>
                     <th className="py-3 px-5 font-medium text-right">Status</th>
                   </tr>
@@ -217,16 +226,30 @@ export default function UserDetailsPage() {
                 <tbody className="divide-y divide-gray-100">
                   {attempts.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-8 text-center text-gray-500">No tests attempted yet.</td>
+                      <td colSpan={5} className="py-8 text-center text-gray-500">No tests attempted yet.</td>
                     </tr>
                   ) : (
-                    attempts.slice(0, 5).map((attempt, idx) => (
+                    attempts.slice(0, 8).map((attempt, idx) => (
                       <tr key={idx} className="hover:bg-gray-50/50">
-                        <td className="py-3 px-5 font-medium text-gray-900">{attempt.test?.title || attempt.testName || `Test #${attempt.test_id}`}</td>
-                        <td className="py-3 px-5 text-gray-600">{new Date(attempt.createdAt || attempt.start_time).toLocaleDateString()}</td>
-                        <td className="py-3 px-5 text-gray-600">{attempt.score}/{attempt.total_marks || 100}</td>
+                        <td className="py-3 px-5 font-medium text-gray-900">
+                          <div>{attempt.test?.title || attempt.testName || `Test #${attempt.test_id}`}</div>
+                          {(attempt.testSeries?.title || attempt.test_series_title || attempt.test_series_id || attempt.testSeriesId) && (
+                            <div className="text-xs text-gray-500">
+                              Series: {attempt.testSeries?.title || attempt.test_series_title || `#${attempt.test_series_id || attempt.testSeriesId}`}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-5 text-gray-600">{formatDateTime(attempt.created_at || attempt.createdAt || attempt.start_time)}</td>
+                        <td className="py-3 px-5 text-gray-600">
+                          {attempt.time_taken_seconds !== undefined && attempt.time_taken_seconds !== null
+                            ? formatDurationSeconds(attempt.time_taken_seconds)
+                            : '—'}
+                        </td>
+                        <td className="py-3 px-5 text-gray-600">{attempt.score ?? 0}/{attempt.total_marks || 100}</td>
                         <td className="py-3 px-5 text-right">
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">Completed</span>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadgeClasses(attempt.status || 'COMPLETED')}`}>
+                            {attempt.status || 'Completed'}
+                          </span>
                         </td>
                       </tr>
                     ))
@@ -234,6 +257,38 @@ export default function UserDetailsPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Activity Log */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="font-bold text-gray-900">Activity Timeline</h3>
+              <span className="text-xs text-gray-500">{activity.length} events</span>
+            </div>
+            {activity.length === 0 ? (
+              <div className="p-6 text-center text-sm text-gray-500">No recorded activity events yet.</div>
+            ) : (
+              <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+                {activity.slice(0, 20).map((act, idx) => {
+                  const eventType = act.activity_type || act.action || act.type || 'ACTIVITY';
+                  return (
+                    <div key={act.id || idx} className="px-5 py-3 flex items-center justify-between gap-4 text-sm">
+                      <div>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-indigo-50 text-indigo-700 mr-2">
+                          {eventType}
+                        </span>
+                        <span className="text-gray-700">
+                          {act.description || act.details || (act.test_id ? `Test #${act.test_id}` : '')}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-500 shrink-0">
+                        {formatDateTime(act.created_at || act.timestamp || act.createdAt)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

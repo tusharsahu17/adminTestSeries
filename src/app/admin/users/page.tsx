@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { adminService } from '../../../services/adminService';
 import Link from 'next/link';
 import { Loader2, Search, Filter, ShieldBan, Eye } from 'lucide-react';
+import { formatDateTime } from '../../../utils/formatters';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -100,6 +101,7 @@ export default function UsersPage() {
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Joined</th>
+                <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Active</th>
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Subscription</th>
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
@@ -107,13 +109,13 @@ export default function UsersPage() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center">
+                  <td colSpan={6} className="py-12 text-center">
                     <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mx-auto" />
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-gray-500">No users found.</td>
+                  <td colSpan={6} className="py-12 text-center text-gray-500">No users found.</td>
                 </tr>
               ) : (
                 users.map((user) => (
@@ -140,6 +142,9 @@ export default function UsersPage() {
                     </td>
                     <td className="py-3 px-5 text-sm text-gray-600">
                       {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}
+                    </td>
+                    <td className="py-3 px-5 text-xs text-gray-500">
+                      {formatDateTime(user.last_active_at || user.lastActiveAt || user.last_login_at || user.lastLoginAt)}
                     </td>
                     <td className="py-3 px-5">
                       {user.subscription_status === 'active' ? (
