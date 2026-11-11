@@ -65,20 +65,37 @@ export function getStatusBadgeClasses(status?: string | null): string {
     case 'PUBLISHED':
     case 'COMPLETED':
     case 'PAID':
+    case 'HIGHLY_ACTIVE':
+    case 'IMPROVING':
+    case 'PASS':
+    case 'PASSED':
+    case 'STRONG':
       return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
     case 'PENDING':
     case 'SCHEDULED':
     case 'ONGOING':
     case 'IN_PROGRESS':
+    case 'INACTIVE':
+    case 'AT_RISK':
+    case 'MODERATE':
+    case 'AVERAGE':
+    case 'STABLE':
       return 'bg-amber-50 text-amber-700 border border-amber-200';
     case 'FAILED':
+    case 'FAIL':
     case 'CANCELLED':
     case 'REVOKED':
     case 'BLOCKED':
+    case 'DECLINING':
+    case 'WEAK':
+    case 'DORMANT':
       return 'bg-rose-50 text-rose-700 border border-rose-200';
     case 'REFUNDED':
     case 'EXPIRED':
       return 'bg-purple-50 text-purple-700 border border-purple-200';
+    case 'FREE':
+    case 'NEW':
+      return 'bg-blue-50 text-blue-700 border border-blue-200';
     default:
       return 'bg-gray-100 text-gray-700 border border-gray-200';
   }

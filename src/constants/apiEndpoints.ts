@@ -27,4 +27,30 @@ export const ENDPOINTS = {
   ADMIN_PAYMENT_REFUND: (id: string | number) => `/api/admin/payments/${id}/refund`,
   ADMIN_SUBSCRIPTIONS: '/api/admin/payments/subscriptions',
   ADMIN_SUBSCRIPTION_STATUS: (id: string | number) => `/api/admin/payments/subscriptions/${id}/status`,
+
+  // Users Management
+  ADMIN_USERS: '/api/admin/users',
+  ADMIN_USER_DETAIL: (userId: string | number) => `/api/admin/users/${userId}`,
+  ADMIN_USER_ANALYTICS: (userId: string | number) => `/api/admin/users/${userId}/analytics`,
+  ADMIN_USER_TEST_HISTORY: (userId: string | number) => `/api/admin/users/${userId}/test-history`,
+  ADMIN_USER_ATTEMPTS: (userId: string | number) => `/api/admin/users/${userId}/attempts`,
+  ADMIN_USER_TEST_HISTORY_DETAIL: (userId: string | number, attemptId: string | number) =>
+    `/api/admin/users/${userId}/test-history/${attemptId}`,
+  ADMIN_USER_ATTEMPT_DETAIL: (userId: string | number, attemptId: string | number) =>
+    `/api/admin/users/${userId}/attempts/${attemptId}`,
+  ADMIN_USER_TEST_SERIES: (userId: string | number) => `/api/admin/users/${userId}/test-series`,
+  ADMIN_USER_TEST_SERIES_EXTEND: (userId: string | number, enrollmentId: string | number) =>
+    `/api/admin/users/${userId}/test-series/${enrollmentId}/extend`,
+  ADMIN_USER_TEST_SERIES_STATUS: (userId: string | number, enrollmentId: string | number) =>
+    `/api/admin/users/${userId}/test-series/${enrollmentId}/status`,
+  ADMIN_USER_PAYMENTS: (userId: string | number) => `/api/admin/users/${userId}/payments`,
+  ADMIN_USER_PAYMENT_DETAIL: (userId: string | number, paymentId: string | number) =>
+    `/api/admin/users/${userId}/payments/${paymentId}`,
+  ADMIN_USER_ACTIVITY: (userId: string | number) => `/api/admin/users/${userId}/activity`,
+  ADMIN_USER_REPORT: (userId: string | number) => `/api/admin/users/${userId}/report`,
+  ADMIN_USER_STATUS: (userId: string | number) => `/api/admin/users/${userId}/status`,
+  ADMIN_USER_PASSWORD: (userId: string | number) => `/api/admin/users/${userId}/password`,
+  ADMIN_USER_RESET_PASSWORD: (userId: string | number) => `/api/admin/users/${userId}/reset-password`,
+  ADMIN_USER_PROFILE: (userId: string | number) => `/api/admin/users/${userId}/profile`,
+  ADMIN_USER_SUBSCRIPTION: (userId: string | number) => `/api/admin/users/${userId}/subscription`,
 };

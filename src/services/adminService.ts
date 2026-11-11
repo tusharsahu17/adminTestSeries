@@ -1,8 +1,9 @@
-import { getData, postData, putData, patchData, deleteData } from './apiClient';
+import { getData, postData, putData, deleteData } from './apiClient';
 import { analyticsService } from './admin/analyticsService';
 import { enrollmentService } from './admin/enrollmentService';
 import { paymentService } from './admin/paymentService';
 import { subscriptionService } from './admin/subscriptionService';
+import { userService } from './admin/userService';
 import type {
   DashboardQueryParams,
   RevenueAnalyticsParams,
@@ -20,6 +21,19 @@ import type {
   CreateSubscriptionPayload,
   UpdateSubscriptionStatusPayload,
 } from '../types/admin/subscription';
+import type {
+  AssignUserTestSeriesPayload,
+  ExtendUserTestSeriesPayload,
+  GetUsersParams,
+  ResetUserPasswordPayload,
+  UpdateUserProfilePayload,
+  UpdateUserStatusPayload,
+  UpdateUserSubscriptionPayload,
+  UpdateUserTestSeriesStatusPayload,
+  UserActivityQueryParams,
+  UserHistoryQueryParams,
+  UserPaymentQueryParams,
+} from '../types/admin/user';
 
 export const adminService = {
   // Dashboard & Analytics
@@ -55,27 +69,70 @@ export const adminService = {
     subscriptionService.updateStatus(id, data),
   
   // Users
-  getUsers: async (params?: any) => {
+  getUsers: async (params?: GetUsersParams) => {
     return await getData('/api/admin/users', params);
   },
+  getUsersList: (params?: GetUsersParams) => userService.list(params),
   getUserProfile: async (userId: string) => {
     return await getData(`/api/admin/users/${userId}`);
   },
-  getUserAttempts: async (userId: string) => {
-    return await getData(`/api/admin/users/${userId}/attempts`);
+  getUserOverview: (userId: string | number) => userService.getOverview(userId),
+  getUserAnalytics: (userId: string | number) => userService.getAnalytics(userId),
+  getUserAttempts: async (userId: string, params?: UserHistoryQueryParams) => {
+    return await getData(`/api/admin/users/${userId}/attempts`, params);
   },
+  getUserTestHistory: (userId: string | number, params?: UserHistoryQueryParams) =>
+    userService.getTestHistory(userId, params),
+  getUserAttemptDetail: (userId: string | number, attemptId: string | number) =>
+    userService.getAttemptDetail(userId, attemptId),
+  getUserTestSeries: (userId: string | number) => userService.getTestSeries(userId),
+  assignUserTestSeries: (userId: string | number, data: AssignUserTestSeriesPayload) =>
+    userService.assignTestSeries(userId, data),
+  extendUserTestSeries: (
+    userId: string | number,
+    enrollmentId: string | number,
+    data: ExtendUserTestSeriesPayload
+  ) => userService.extendTestSeries(userId, enrollmentId, data),
+  updateUserTestSeriesStatus: (
+    userId: string | number,
+    enrollmentId: string | number,
+    data: UpdateUserTestSeriesStatusPayload
+  ) => userService.updateTestSeriesStatus(userId, enrollmentId, data),
+  getUserPayments: (userId: string | number, params?: UserPaymentQueryParams) =>
+    userService.getPayments(userId, params),
+  getUserPaymentDetail: (userId: string | number, paymentId: string | number) =>
+    userService.getPaymentDetail(userId, paymentId),
   getUserActivity: async (userId: string) => {
     return await getData(`/api/admin/users/${userId}/activity`);
   },
-  updateUserDetails: async (userId: string, data: any) => {
-    return await patchData(`/api/admin/users/${userId}/profile`, data);
+  getUserActivityLogs: (userId: string | number, params?: UserActivityQueryParams) =>
+    userService.getActivity(userId, params),
+  exportUserReport: (userId: string | number, format: 'json' | 'csv' = 'json') =>
+    userService.exportReport(userId, format),
+  updateUserDetails: (userId: string | number, data: UpdateUserProfilePayload) =>
+    userService.updateProfile(userId, data),
+  replaceUserDetails: (userId: string | number, data: UpdateUserProfilePayload) =>
+    userService.replaceUser(userId, data),
+  resetUserPassword: (
+    userId: string | number,
+    newPasswordOrPayload: string | ResetUserPasswordPayload,
+    confirmPassword?: string
+  ) => {
+    const payload: ResetUserPasswordPayload =
+      typeof newPasswordOrPayload === 'string'
+        ? {
+            newPassword: newPasswordOrPayload,
+            confirmPassword: confirmPassword ?? newPasswordOrPayload,
+          }
+        : newPasswordOrPayload;
+    return userService.resetPassword(userId, payload);
   },
-  resetUserPassword: async (userId: string, newPassword: string) => {
-    return await patchData(`/api/admin/users/${userId}/reset-password`, { newPassword });
-  },
-  updateUserStatus: async (userId: string, status: string) => {
-    return await patchData(`/api/admin/users/${userId}/status`, { status });
-  },
+  updateUserStatus: (userId: string | number, statusOrPayload: string | UpdateUserStatusPayload) =>
+    userService.updateStatus(userId, statusOrPayload),
+  updateUserSubscription: (
+    userId: string | number,
+    subscriptionOrPayload: string | UpdateUserSubscriptionPayload
+  ) => userService.updateSubscription(userId, subscriptionOrPayload),
   
   // Subjects & Hierarchy
   getSubjects: async () => {
