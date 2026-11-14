@@ -236,6 +236,9 @@ export const adminService = {
   getTests: async (params?: any) => {
     return await getData('/api/admin/tests', params);
   },
+  getTestDetails: async (id: string | number) => {
+    return await getData(`/api/admin/tests/${id}`);
+  },
   createTest: async (data: any) => {
     return await postData('/api/admin/tests', data);
   },
@@ -244,6 +247,9 @@ export const adminService = {
   },
   deleteTest: async (id: string) => {
     return await deleteData(`/api/admin/tests/${id}`);
+  },
+  duplicateTest: async (id: string | number) => {
+    return await postData(`/api/admin/tests/${id}/duplicate`);
   },
   
   // Questions

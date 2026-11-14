@@ -1,13 +1,15 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
 import { adminService } from '../../../services/adminService';
-import { Loader2, Search, Filter, Plus, Edit, Trash2, Upload, HelpCircle, X, Eye } from 'lucide-react';
+import { Loader2, Search, Filter, Plus, Edit, Trash2, Upload, HelpCircle, X, Eye, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<any[]>([]);
+  const [tests, setTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTestFilter, setSelectedTestFilter] = useState('');
   
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -20,6 +22,7 @@ export default function QuestionsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
+    test_id: '',
     question_text: '',
     question_type: 'MCQ',
     marks: 1,
@@ -42,7 +45,10 @@ export default function QuestionsPage() {
   const fetchQuestions = async () => {
     setLoading(true);
     try {
-      const res = await adminService.getQuestions({ search: searchTerm });
+      const params: any = {};
+      if (searchTerm) params.search = searchTerm;
+      if (selectedTestFilter) params.test_id = selectedTestFilter;
+      const res = await adminService.getQuestions(params);
       const data = res.data?.questions || res.data || res;
       setQuestions(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -52,12 +58,33 @@ export default function QuestionsPage() {
     }
   };
 
+  const fetchTests = async () => {
+    try {
+      const res = await adminService.getTests();
+      const testList = res.tests || res.data?.tests || res.data || res;
+      setTests(Array.isArray(testList) ? testList : []);
+    } catch (err) {
+      console.error('Failed to fetch tests:', err);
+    }
+  };
+
   useEffect(() => {
     fetchQuestions();
-  }, [searchTerm]);
+  }, [searchTerm, selectedTestFilter]);
+
+  useEffect(() => {
+    fetchTests();
+  }, []);
+
+  const getTestTitle = (testId: string | number) => {
+    if (!testId) return null;
+    const found = tests.find(t => String(t.id) === String(testId));
+    return found ? (found.title || found.name) : `Test #${testId}`;
+  };
 
   const resetForm = () => {
     setForm({
+      test_id: '',
       question_text: '',
       question_type: 'MCQ',
       marks: 1,
@@ -102,6 +129,7 @@ export default function QuestionsPage() {
     }
     
     setForm({
+      test_id: fullQuestion.test_id ? String(fullQuestion.test_id) : '',
       question_text: fullQuestion.question_text || fullQuestion.question || '',
       question_type: fullQuestion.question_type || fullQuestion.type || 'MCQ',
       marks: fullQuestion.marks || 1,
@@ -128,7 +156,11 @@ export default function QuestionsPage() {
     if (!form.question_text) return alert("Question text is required");
     setSubmitting(true);
     try {
-      await adminService.createQuestion(form);
+      const payload = {
+        ...form,
+        test_id: form.test_id ? parseInt(form.test_id, 10) : null,
+      };
+      await adminService.createQuestion(payload);
       alert("Question created successfully");
       setIsCreateOpen(false);
       resetForm();
@@ -146,7 +178,11 @@ export default function QuestionsPage() {
     if (!selectedQuestionId) return;
     setSubmitting(true);
     try {
-      await adminService.updateQuestion(selectedQuestionId, form);
+      const payload = {
+        ...form,
+        test_id: form.test_id ? parseInt(form.test_id, 10) : null,
+      };
+      await adminService.updateQuestion(selectedQuestionId, payload);
       alert("Question updated successfully");
       setIsEditOpen(false);
       resetForm();
@@ -207,7 +243,7 @@ export default function QuestionsPage() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Question Bank</h1>
-          <p className="text-sm text-gray-500">Manage questions for all tests.</p>
+          <p className="text-sm text-gray-500">Manage questions across all tests or in the general pool.</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setIsUploadOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium transition-colors shadow-sm">
@@ -220,7 +256,7 @@ export default function QuestionsPage() {
       </header>
 
       <section className="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 overflow-hidden">
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between gap-4">
+        <div className="p-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
           <div className="flex-1 max-w-md relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input 
@@ -231,10 +267,19 @@ export default function QuestionsPage() {
               className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors">
-              <Filter className="w-4 h-4" /> Filter by Subject/Topic
-            </button>
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedTestFilter}
+              onChange={(e) => setSelectedTestFilter(e.target.value)}
+              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">All Questions (Bank & Tests)</option>
+              {tests.map((t) => (
+                <option key={t.id} value={t.id}>
+                  Filtered to: {t.title || t.name} (#{t.id})
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -245,7 +290,7 @@ export default function QuestionsPage() {
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Question snippet</th>
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Subject/Topic</th>
-                <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned Test</th>
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Diff</th>
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
@@ -270,7 +315,7 @@ export default function QuestionsPage() {
                         <HelpCircle className="w-5 h-5 text-gray-400 mt-0.5 shrink-0" />
                         <div>
                           <p className="font-medium text-gray-900 text-sm line-clamp-2">{q.question_text || q.text || q.question}</p>
-                          <p className="text-xs text-gray-500 mt-1">Marks: <span className="font-semibold">{q.marks || 1}</span> | Neg: <span className="font-semibold text-red-600">{q.negative_marks || 0}</span></p>
+                          <p className="text-xs text-gray-500 mt-1">Marks: <span className="font-semibold">{q.marks || 1}</span> | Neg: <span className="font-semibold text-red-600">-{q.negative_marks || 0}</span></p>
                         </div>
                       </div>
                     </td>
@@ -278,16 +323,23 @@ export default function QuestionsPage() {
                       <div className="text-sm text-gray-900 font-medium">{q.subject || 'N/A'}</div>
                       <div className="text-xs text-gray-500">{q.topic || 'N/A'}</div>
                     </td>
-                    <td className="py-3 px-5 text-sm font-medium text-gray-600">
-                      {q.type === 'mcq' ? 'MCQ' : q.type === 'multiple' ? 'Multiple' : q.type === 'tf' ? 'True/False' : q.type || 'MCQ'}
+                    <td className="py-3 px-5">
+                      {q.test_id ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          <FileText className="w-3 h-3" />
+                          <span className="truncate max-w-[140px]">{getTestTitle(q.test_id)}</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">General Bank</span>
+                      )}
                     </td>
                     <td className="py-3 px-5">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        q.difficulty === 'hard' ? 'bg-red-100 text-red-800' :
-                        q.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                        q.difficulty === 'hard' || q.difficulty === 'Hard' ? 'bg-red-100 text-red-800' :
+                        q.difficulty === 'medium' || q.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
                         'bg-green-100 text-green-800'
                       }`}>
-                        {q.difficulty || 'Easy'}
+                        {q.difficulty || 'Medium'}
                       </span>
                     </td>
                     <td className="py-3 px-5 text-right">
@@ -355,7 +407,22 @@ export default function QuestionsPage() {
             </div>
             
             <form onSubmit={isEditOpen ? handleEdit : handleCreate} className="space-y-5">
-              
+              {/* Optional Test Assignment */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Specific Test (Optional)</label>
+                <select 
+                  value={form.test_id} 
+                  onChange={e => setForm({...form, test_id: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                >
+                  <option value="">None (General Question Bank)</option>
+                  {tests.map(t => (
+                    <option key={t.id} value={t.id}>{t.title || t.name} (#{t.id})</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">If selected, this question will immediately be linked to that test.</p>
+              </div>
+
               {/* Question Text */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Question Text <span className="text-red-500">*</span></label>
@@ -502,8 +569,8 @@ export default function QuestionsPage() {
                   <p className="text-sm font-medium text-gray-900">{viewData.subject || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Topic</p>
-                  <p className="text-sm font-medium text-gray-900">{viewData.topic || '-'}</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Assigned Test</p>
+                  <p className="text-sm font-medium text-gray-900">{getTestTitle(viewData.test_id) || 'General Bank'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Marks / Neg</p>

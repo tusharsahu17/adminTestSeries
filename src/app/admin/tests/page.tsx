@@ -1,14 +1,33 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { adminService } from '../../../services/adminService';
-import { Loader2, Search, Plus, Edit, Copy, Trash2, Clock, CheckCircle, FileText, Eye, X } from 'lucide-react';
+import {
+  Loader2,
+  Search,
+  Plus,
+  Edit,
+  Copy,
+  Trash2,
+  Clock,
+  CheckCircle,
+  FileText,
+  Eye,
+  X,
+  HelpCircle,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  Layers,
+  Sparkles,
+} from 'lucide-react';
 import Link from 'next/link';
 
 export default function TestsPage() {
   const [tests, setTests] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Search state
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -20,6 +39,39 @@ export default function TestsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
 
+  // Manage Questions Modal states
+  const [isManageQuestionsOpen, setIsManageQuestionsOpen] = useState(false);
+  const [activeTestForQuestions, setActiveTestForQuestions] = useState<any>(null);
+  const [testQuestions, setTestQuestions] = useState<any[]>([]);
+  const [loadingTestQuestions, setLoadingTestQuestions] = useState(false);
+  const [questionTab, setQuestionTab] = useState<'linked' | 'bank' | 'create'>('linked');
+
+  // Bank questions state (questions not in this test)
+  const [bankQuestions, setBankQuestions] = useState<any[]>([]);
+  const [loadingBankQuestions, setLoadingBankQuestions] = useState(false);
+  const [bankSearch, setBankSearch] = useState('');
+  const [selectedBankQuestionIds, setSelectedBankQuestionIds] = useState<Set<number>>(new Set());
+  const [addingFromBank, setAddingFromBank] = useState(false);
+
+  // New question form state
+  const [newQuestionForm, setNewQuestionForm] = useState({
+    question_text: '',
+    question_type: 'MCQ',
+    marks: 1,
+    negative_marks: 0,
+    difficulty: 'Medium',
+    explanation: '',
+    topic: '',
+    options: [
+      { option_text: '', option_key: 'A', is_correct: true, display_order: 1 },
+      { option_text: '', option_key: 'B', is_correct: false, display_order: 2 },
+      { option_text: '', option_key: 'C', is_correct: false, display_order: 3 },
+      { option_text: '', option_key: 'D', is_correct: false, display_order: 4 },
+    ],
+  });
+  const [creatingQuestion, setCreatingQuestion] = useState(false);
+  const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
+
   const [form, setForm] = useState({
     title: '',
     duration: 60,
@@ -27,8 +79,14 @@ export default function TestsPage() {
     passing_marks: 33,
     subject_id: '',
     is_published: false,
-    questions_count: 0
+    questions_count: 0,
   });
+
+  const getSubjectName = (subjectId: string | number) => {
+    if (!subjectId) return 'Unassigned';
+    const sub = subjects.find((s) => String(s.id) === String(subjectId));
+    return sub ? sub.name : `Subject #${subjectId}`;
+  };
 
   const fetchTests = async () => {
     setLoading(true);
@@ -46,7 +104,6 @@ export default function TestsPage() {
   const fetchSubjects = async () => {
     try {
       const res = await adminService.getSubjects();
-      // res might be { subjects: [...] } from the API or { data: [...] } from mock
       const data = res?.subjects || res?.data?.subjects || res?.data || res;
       setSubjects(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -64,12 +121,12 @@ export default function TestsPage() {
     if (!form.title || !form.subject_id) return alert('Title and Subject are required');
     setSubmitting(true);
     try {
-      const payload = { 
-        ...form, 
+      const payload = {
+        ...form,
         name: form.title,
         subject_id: parseInt(form.subject_id, 10),
         total_questions: form.questions_count,
-        duration_minutes: form.duration
+        duration_minutes: form.duration,
       };
       await adminService.createTest(payload);
       alert('Test created successfully!');
@@ -86,15 +143,16 @@ export default function TestsPage() {
 
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !selectedTestId || !form.subject_id) return alert('Title and Subject are required');
+    if (!form.title || !selectedTestId || !form.subject_id)
+      return alert('Title and Subject are required');
     setSubmitting(true);
     try {
-      const payload = { 
-        ...form, 
+      const payload = {
+        ...form,
         name: form.title,
         subject_id: parseInt(form.subject_id, 10),
         total_questions: form.questions_count,
-        duration_minutes: form.duration
+        duration_minutes: form.duration,
       };
       await adminService.updateTest(selectedTestId, payload);
       alert('Test updated successfully!');
@@ -122,6 +180,19 @@ export default function TestsPage() {
     }
   };
 
+  const handleDuplicate = async (id: string | number) => {
+    if (confirm('Create a duplicate copy of this test?')) {
+      try {
+        await adminService.duplicateTest(id);
+        alert('Test duplicated successfully');
+        fetchTests();
+      } catch (err) {
+        console.error('Duplicate failed:', err);
+        alert('Failed to duplicate test');
+      }
+    }
+  };
+
   const openEditModal = (item: any) => {
     setSelectedTestId(item.id);
     setForm({
@@ -131,7 +202,7 @@ export default function TestsPage() {
       passing_marks: item.passing_marks || 33,
       subject_id: item.subject_id || '',
       is_published: !!item.is_published,
-      questions_count: item.total_questions || item.questions_count || 0
+      questions_count: item.total_questions || item.questions_count || 0,
     });
     setIsEditOpen(true);
   };
@@ -149,9 +220,193 @@ export default function TestsPage() {
       passing_marks: 33,
       subject_id: '',
       is_published: false,
-      questions_count: 0
+      questions_count: 0,
     });
     setSelectedTestId(null);
+  };
+
+  // --- MANAGE QUESTIONS LOGIC ---
+
+  const fetchTestQuestions = async (testId: string | number) => {
+    setLoadingTestQuestions(true);
+    try {
+      // 1. Try detailed test endpoint which returns questions
+      let loaded: any[] = [];
+      try {
+        const res = await adminService.getTestDetails(testId);
+        loaded = res?.questions || res?.data?.questions || [];
+      } catch (e) {
+        // Fallback
+      }
+
+      if (!loaded || loaded.length === 0) {
+        const qRes = await adminService.getQuestions({ test_id: testId });
+        const qData = qRes?.questions || qRes?.data?.questions || qRes?.data || qRes;
+        loaded = Array.isArray(qData) ? qData : [];
+      }
+
+      setTestQuestions(loaded);
+      // Sync local tests state with question count
+      setTests((prev) =>
+        prev.map((t) =>
+          String(t.id) === String(testId)
+            ? { ...t, total_questions: loaded.length, questions_count: loaded.length }
+            : t
+        )
+      );
+    } catch (err) {
+      console.error('Failed to fetch test questions:', err);
+    } finally {
+      setLoadingTestQuestions(false);
+    }
+  };
+
+  const fetchBankQuestions = async () => {
+    setLoadingBankQuestions(true);
+    try {
+      const res = await adminService.getQuestions({ search: bankSearch });
+      const data = res?.questions || res?.data?.questions || res?.data || res;
+      const all: any[] = Array.isArray(data) ? data : [];
+      // Filter out questions already linked to this test
+      const currentIds = new Set(testQuestions.map((q) => Number(q.id)));
+      const available = all.filter((q) => !currentIds.has(Number(q.id)));
+      setBankQuestions(available);
+    } catch (err) {
+      console.error('Failed to fetch bank questions:', err);
+    } finally {
+      setLoadingBankQuestions(false);
+    }
+  };
+
+  const openManageQuestionsModal = (test: any) => {
+    setActiveTestForQuestions(test);
+    setQuestionTab('linked');
+    setSelectedBankQuestionIds(new Set());
+    setBankSearch('');
+    setIsManageQuestionsOpen(true);
+    fetchTestQuestions(test.id);
+  };
+
+  useEffect(() => {
+    if (isManageQuestionsOpen && questionTab === 'bank' && activeTestForQuestions) {
+      fetchBankQuestions();
+    }
+  }, [isManageQuestionsOpen, questionTab, bankSearch]);
+
+  const toggleSelectBankQuestion = (qId: number) => {
+    const updated = new Set(selectedBankQuestionIds);
+    if (updated.has(qId)) {
+      updated.delete(qId);
+    } else {
+      updated.add(qId);
+    }
+    setSelectedBankQuestionIds(updated);
+  };
+
+  const toggleSelectAllBank = () => {
+    if (selectedBankQuestionIds.size === bankQuestions.length) {
+      setSelectedBankQuestionIds(new Set());
+    } else {
+      setSelectedBankQuestionIds(new Set(bankQuestions.map((q) => Number(q.id))));
+    }
+  };
+
+  const handleAddSelectedFromBank = async () => {
+    if (selectedBankQuestionIds.size === 0 || !activeTestForQuestions) return;
+    setAddingFromBank(true);
+    try {
+      const ids = Array.from(selectedBankQuestionIds);
+      // Link each question to this test
+      await Promise.all(
+        ids.map((id) =>
+          adminService.updateQuestion(String(id), { test_id: activeTestForQuestions.id })
+        )
+      );
+
+      // Re-fetch questions for this test and update counts
+      await fetchTestQuestions(activeTestForQuestions.id);
+      setSelectedBankQuestionIds(new Set());
+      setQuestionTab('linked');
+      alert(`Successfully added ${ids.length} question(s) to this test!`);
+    } catch (err) {
+      console.error('Failed to add questions from bank:', err);
+      alert('Failed to add some questions to the test');
+    } finally {
+      setAddingFromBank(false);
+    }
+  };
+
+  const handleUnlinkQuestion = async (questionId: string | number) => {
+    if (
+      !confirm(
+        'Unlink this question from this test? The question will remain safely in the general Question Bank.'
+      )
+    ) {
+      return;
+    }
+    try {
+      await adminService.updateQuestion(String(questionId), { test_id: null });
+      if (activeTestForQuestions) {
+        await fetchTestQuestions(activeTestForQuestions.id);
+      }
+    } catch (err) {
+      console.error('Failed to unlink question:', err);
+      alert('Failed to unlink question');
+    }
+  };
+
+  const handleCreateNewQuestionForTest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newQuestionForm.question_text.trim()) {
+      return alert('Question text is required');
+    }
+    if (!activeTestForQuestions) return;
+
+    setCreatingQuestion(true);
+    try {
+      const subjectName = getSubjectName(activeTestForQuestions.subject_id);
+      const payload = {
+        ...newQuestionForm,
+        test_id: activeTestForQuestions.id,
+        subject: subjectName,
+      };
+      await adminService.createQuestion(payload);
+
+      // Reset new question form
+      setNewQuestionForm({
+        question_text: '',
+        question_type: 'MCQ',
+        marks: 1,
+        negative_marks: 0,
+        difficulty: 'Medium',
+        explanation: '',
+        topic: '',
+        options: [
+          { option_text: '', option_key: 'A', is_correct: true, display_order: 1 },
+          { option_text: '', option_key: 'B', is_correct: false, display_order: 2 },
+          { option_text: '', option_key: 'C', is_correct: false, display_order: 3 },
+          { option_text: '', option_key: 'D', is_correct: false, display_order: 4 },
+        ],
+      });
+
+      // Refresh test questions and switch back to linked view
+      await fetchTestQuestions(activeTestForQuestions.id);
+      setQuestionTab('linked');
+      alert('New question created and attached to this test successfully!');
+    } catch (err) {
+      console.error('Failed to create question for test:', err);
+      alert('Failed to create question');
+    } finally {
+      setCreatingQuestion(false);
+    }
+  };
+
+  const setCorrectOptionInNewForm = (index: number) => {
+    const updated = newQuestionForm.options.map((opt, i) => ({
+      ...opt,
+      is_correct: i === index,
+    }));
+    setNewQuestionForm({ ...newQuestionForm, options: updated });
   };
 
   return (
@@ -159,9 +414,15 @@ export default function TestsPage() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Exam/Test Management</h1>
-          <p className="text-sm text-gray-500">Create tests, set rules, and duplicate exams.</p>
+          <p className="text-sm text-gray-500">Create tests, manage questions, and duplicate exams.</p>
         </div>
-        <button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
+        <button
+          onClick={() => {
+            resetForm();
+            setIsCreateOpen(true);
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+        >
           <Plus className="w-4 h-4" /> Create New Test
         </button>
       </header>
@@ -170,8 +431,8 @@ export default function TestsPage() {
         <div className="p-5 border-b border-gray-100 flex items-center justify-between gap-4">
           <div className="flex-1 max-w-md relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Search by test name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -201,7 +462,9 @@ export default function TestsPage() {
                 </tr>
               ) : tests.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-500">No tests found.</td>
+                  <td colSpan={6} className="py-12 text-center text-gray-500">
+                    No tests found.
+                  </td>
                 </tr>
               ) : (
                 tests.map((test) => (
@@ -214,7 +477,10 @@ export default function TestsPage() {
                         </div>
                         <div>
                           <p className="font-medium text-gray-900">{test.title || test.name}</p>
-                          <p className="text-xs text-gray-500">Passing: {test.passing_marks || 0}/{test.total_marks || 0} &bull; {test.total_questions || test.questions_count || 0} Questions</p>
+                          <p className="text-xs text-gray-500">
+                            {getSubjectName(test.subject_id)} &bull; Passing: {test.passing_marks || 0}/
+                            {test.total_marks || 0}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -224,7 +490,14 @@ export default function TestsPage() {
                       </div>
                     </td>
                     <td className="py-3 px-5 text-sm font-medium text-gray-900">
-                      {test.total_questions || test.questions_count || 0}
+                      <button
+                        onClick={() => openManageQuestionsModal(test)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors"
+                        title="Click to manage questions"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>{test.total_questions || test.questions_count || 0} Questions</span>
+                      </button>
                     </td>
                     <td className="py-3 px-5">
                       {String(test.status || '').toLowerCase() === 'scheduled' ? (
@@ -243,16 +516,40 @@ export default function TestsPage() {
                     </td>
                     <td className="py-3 px-5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Duplicate">
+                        <button
+                          onClick={() => openManageQuestionsModal(test)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-xs"
+                          title="Add / Manage Questions"
+                        >
+                          <HelpCircle className="w-3.5 h-3.5" />
+                          <span>Questions</span>
+                        </button>
+                        <button
+                          onClick={() => handleDuplicate(test.id)}
+                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                          title="Duplicate Test"
+                        >
                           <Copy className="w-4 h-4" />
                         </button>
-                        <button onClick={() => openViewModal(test)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="View">
+                        <button
+                          onClick={() => openViewModal(test)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="View"
+                        >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button onClick={() => openEditModal(test)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Edit">
+                        <button
+                          onClick={() => openEditModal(test)}
+                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                          title="Edit"
+                        >
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDelete(test.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
+                        <button
+                          onClick={() => handleDelete(test.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Delete"
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -265,91 +562,631 @@ export default function TestsPage() {
         </div>
       </section>
 
-      {/* Modal for Create/Edit Test */}
+      {/* --- MANAGE QUESTIONS MODAL --- */}
+      {isManageQuestionsOpen && activeTestForQuestions && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-100 flex items-start justify-between bg-gradient-to-r from-gray-50 to-indigo-50/30">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
+                  <HelpCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl font-bold text-gray-900">
+                      {activeTestForQuestions.title || activeTestForQuestions.name}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-700">
+                      #{activeTestForQuestions.id}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                    <span>Subject: <strong>{getSubjectName(activeTestForQuestions.subject_id)}</strong></span>
+                    <span>&bull;</span>
+                    <span>Duration: <strong>{activeTestForQuestions.duration_minutes || activeTestForQuestions.duration || 60}m</strong></span>
+                    <span>&bull;</span>
+                    <span>Total Marks: <strong>{activeTestForQuestions.total_marks || 100}</strong></span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsManageQuestionsOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Sub-header Navigation Tabs */}
+            <div className="flex border-b border-gray-200 bg-white px-6 gap-6">
+              <button
+                onClick={() => setQuestionTab('linked')}
+                className={`py-3.5 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+                  questionTab === 'linked'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                <span>Linked Questions</span>
+                <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-700 font-bold">
+                  {testQuestions.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setQuestionTab('bank')}
+                className={`py-3.5 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+                  questionTab === 'bank'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                <Search className="w-4 h-4" />
+                <span>Pick from Question Bank</span>
+              </button>
+
+              <button
+                onClick={() => setQuestionTab('create')}
+                className={`py-3.5 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+                  questionTab === 'create'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create New Question</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 flex-1 overflow-y-auto bg-gray-50/50">
+              {/* TAB 1: LINKED QUESTIONS */}
+              {questionTab === 'linked' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-800">
+                        Questions in this Test ({testQuestions.length})
+                      </h4>
+                      <p className="text-xs text-gray-500">
+                        These questions will be presented to students when attempting this test.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setQuestionTab('bank')}
+                        className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 hover:bg-gray-50 text-indigo-600 rounded-lg shadow-xs flex items-center gap-1.5"
+                      >
+                        <Search className="w-3.5 h-3.5" /> Pick from Bank
+                      </button>
+                      <button
+                        onClick={() => setQuestionTab('create')}
+                        className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Create New
+                      </button>
+                    </div>
+                  </div>
+
+                  {loadingTestQuestions ? (
+                    <div className="py-16 text-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-2" />
+                      <p className="text-xs text-gray-500">Loading questions for this test...</p>
+                    </div>
+                  ) : testQuestions.length === 0 ? (
+                    <div className="bg-white border-2 border-dashed border-gray-200 rounded-xl p-12 text-center">
+                      <HelpCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <h5 className="font-bold text-gray-800 mb-1">No questions added yet</h5>
+                      <p className="text-xs text-gray-500 max-w-md mx-auto mb-5">
+                        This test doesn&apos;t have any questions linked yet. You can pick existing questions from your Question Bank or create new questions specifically for this test.
+                      </p>
+                      <div className="flex justify-center gap-3">
+                        <button
+                          onClick={() => setQuestionTab('bank')}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs"
+                        >
+                          Pick from Question Bank
+                        </button>
+                        <button
+                          onClick={() => setQuestionTab('create')}
+                          className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-semibold"
+                        >
+                          Create New Question
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {testQuestions.map((q, idx) => {
+                        const isExpanded = expandedQuestionId === q.id;
+                        return (
+                          <div
+                            key={q.id || idx}
+                            className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs hover:border-gray-300 transition-all"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 flex-1">
+                                <span className="w-6 h-6 rounded-md bg-indigo-50 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                                  {idx + 1}
+                                </span>
+                                <div className="flex-1">
+                                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                    <span className="text-xs font-mono font-semibold text-gray-400">
+                                      #{q.id}
+                                    </span>
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-2xs font-semibold uppercase ${
+                                        q.difficulty === 'Hard' || q.difficulty === 'hard'
+                                          ? 'bg-rose-100 text-rose-700'
+                                          : q.difficulty === 'Medium' || q.difficulty === 'medium'
+                                          ? 'bg-amber-100 text-amber-700'
+                                          : 'bg-emerald-100 text-emerald-700'
+                                      }`}
+                                    >
+                                      {q.difficulty || 'Medium'}
+                                    </span>
+                                    <span className="text-xs text-gray-500 font-medium">
+                                      Marks: <strong className="text-gray-800">{q.marks || 1}</strong>
+                                    </span>
+                                    <span className="text-xs text-gray-500 font-medium">
+                                      Neg: <strong className="text-rose-600">-{q.negative_marks || 0}</strong>
+                                    </span>
+                                  </div>
+                                  <p className="text-sm font-medium text-gray-900 leading-relaxed">
+                                    {q.question_text || q.question || q.text}
+                                  </p>
+
+                                  {/* Expandable options view */}
+                                  {isExpanded && q.options && q.options.length > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-2">
+                                      {q.options.map((opt: any, optIdx: number) => (
+                                        <div
+                                          key={opt.id || optIdx}
+                                          className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
+                                            opt.is_correct
+                                              ? 'border-emerald-500 bg-emerald-50/50 text-emerald-900 font-semibold'
+                                              : 'border-gray-200 bg-gray-50 text-gray-700'
+                                          }`}
+                                        >
+                                          <span className="w-5 h-5 rounded-full bg-white border border-gray-300 flex items-center justify-center font-bold text-2xs">
+                                            {opt.option_key || String.fromCharCode(65 + optIdx)}
+                                          </span>
+                                          <span className="flex-1">{opt.option_text}</span>
+                                          {opt.is_correct && (
+                                            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                                          )}
+                                        </div>
+                                      ))}
+                                      {q.explanation && (
+                                        <div className="col-span-full mt-1 p-2 bg-indigo-50/50 rounded-lg text-xs text-indigo-900">
+                                          <strong>Explanation:</strong> {q.explanation}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {q.options && q.options.length > 0 && (
+                                  <button
+                                    onClick={() =>
+                                      setExpandedQuestionId(isExpanded ? null : q.id)
+                                    }
+                                    className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg text-xs flex items-center gap-1 font-medium transition-colors"
+                                    title={isExpanded ? 'Hide options' : 'View options'}
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronUp className="w-4 h-4" />
+                                    ) : (
+                                      <ChevronDown className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleUnlinkQuestion(q.id)}
+                                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                  title="Unlink from this test"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: PICK FROM QUESTION BANK */}
+              {questionTab === 'bank' && (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search question bank by text or topic..."
+                        value={bankSearch}
+                        onChange={(e) => setBankSearch(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={toggleSelectAllBank}
+                        className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg"
+                      >
+                        {selectedBankQuestionIds.size === bankQuestions.length &&
+                        bankQuestions.length > 0
+                          ? 'Deselect All'
+                          : 'Select All'}
+                      </button>
+
+                      <button
+                        onClick={handleAddSelectedFromBank}
+                        disabled={selectedBankQuestionIds.size === 0 || addingFromBank}
+                        className="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50 shadow-xs flex items-center gap-1.5 transition-colors"
+                      >
+                        {addingFromBank ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="w-3.5 h-3.5" />
+                        )}
+                        <span>Add Selected ({selectedBankQuestionIds.size}) to Test</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {loadingBankQuestions ? (
+                    <div className="py-16 text-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-2" />
+                      <p className="text-xs text-gray-500">Searching Question Bank...</p>
+                    </div>
+                  ) : bankQuestions.length === 0 ? (
+                    <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-gray-500 text-xs">
+                      No available questions found in the Question Bank matching your search.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {bankQuestions.map((q) => {
+                        const isSelected = selectedBankQuestionIds.has(Number(q.id));
+                        return (
+                          <div
+                            key={q.id}
+                            onClick={() => toggleSelectBankQuestion(Number(q.id))}
+                            className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
+                              isSelected
+                                ? 'bg-indigo-50/60 border-indigo-500 ring-1 ring-indigo-500'
+                                : 'bg-white border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelectBankQuestion(Number(q.id))}
+                              className="mt-1 w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-mono font-semibold text-gray-400">
+                                  #{q.id}
+                                </span>
+                                <span
+                                  className={`px-2 py-0.5 rounded text-2xs font-semibold uppercase ${
+                                    q.difficulty === 'Hard' || q.difficulty === 'hard'
+                                      ? 'bg-rose-100 text-rose-700'
+                                      : q.difficulty === 'Medium' || q.difficulty === 'medium'
+                                      ? 'bg-amber-100 text-amber-700'
+                                      : 'bg-emerald-100 text-emerald-700'
+                                  }`}
+                                >
+                                  {q.difficulty || 'Medium'}
+                                </span>
+                                {q.subject && (
+                                  <span className="text-2xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                    {q.subject}
+                                  </span>
+                                )}
+                                {q.topic && (
+                                  <span className="text-2xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                    {q.topic}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs font-medium text-gray-900 line-clamp-2">
+                                {q.question_text || q.question || q.text}
+                              </p>
+                            </div>
+                            <div className="text-right text-xs text-gray-500 shrink-0">
+                              <span>Marks: {q.marks || 1}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: CREATE NEW QUESTION FOR THIS TEST */}
+              {questionTab === 'create' && (
+                <form onSubmit={handleCreateNewQuestionForTest} className="space-y-4">
+                  <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3.5 flex items-center gap-3">
+                    <Sparkles className="w-5 h-5 text-indigo-600 shrink-0" />
+                    <p className="text-xs text-indigo-900 leading-relaxed">
+                      This question will be saved into the master Question Bank and automatically attached to <strong>{activeTestForQuestions.title || activeTestForQuestions.name}</strong>.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Question Text <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                      required
+                      rows={3}
+                      value={newQuestionForm.question_text}
+                      onChange={(e) =>
+                        setNewQuestionForm({ ...newQuestionForm, question_text: e.target.value })
+                      }
+                      placeholder="Type your question prompt here..."
+                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none bg-white"
+                    />
+                  </div>
+
+                  {/* Options */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-700">
+                      Options (Select the correct option with the radio button)
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {newQuestionForm.options.map((opt, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs bg-white ${
+                            opt.is_correct ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-200'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="new_test_correct_opt"
+                            checked={opt.is_correct}
+                            onChange={() => setCorrectOptionInNewForm(idx)}
+                            className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 shrink-0"
+                          />
+                          <span className="font-bold text-gray-700">{opt.option_key}.</span>
+                          <input
+                            type="text"
+                            required
+                            placeholder={`Option ${opt.option_key} text...`}
+                            value={opt.option_text}
+                            onChange={(e) => {
+                              const opts = [...newQuestionForm.options];
+                              opts[idx].option_text = e.target.value;
+                              setNewQuestionForm({ ...newQuestionForm, options: opts });
+                            }}
+                            className="flex-1 px-2.5 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Marks & Difficulty */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-2xs font-bold text-gray-700 mb-1">Marks</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={newQuestionForm.marks}
+                        onChange={(e) =>
+                          setNewQuestionForm({ ...newQuestionForm, marks: Number(e.target.value) })
+                        }
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-2xs font-bold text-gray-700 mb-1">Negative Marks</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.25"
+                        value={newQuestionForm.negative_marks}
+                        onChange={(e) =>
+                          setNewQuestionForm({
+                            ...newQuestionForm,
+                            negative_marks: Number(e.target.value),
+                          })
+                        }
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-2xs font-bold text-gray-700 mb-1">Difficulty</label>
+                      <select
+                        value={newQuestionForm.difficulty}
+                        onChange={(e) =>
+                          setNewQuestionForm({ ...newQuestionForm, difficulty: e.target.value })
+                        }
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                      >
+                        <option value="Easy">Easy</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Hard">Hard</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-2xs font-bold text-gray-700 mb-1">Topic</label>
+                      <input
+                        type="text"
+                        placeholder="Optional topic tag..."
+                        value={newQuestionForm.topic}
+                        onChange={(e) =>
+                          setNewQuestionForm({ ...newQuestionForm, topic: e.target.value })
+                        }
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-2xs font-bold text-gray-700 mb-1">Explanation (Optional)</label>
+                    <textarea
+                      rows={2}
+                      value={newQuestionForm.explanation}
+                      onChange={(e) =>
+                        setNewQuestionForm({ ...newQuestionForm, explanation: e.target.value })
+                      }
+                      placeholder="Explain why the selected option is correct..."
+                      className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none bg-white"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex justify-end gap-2 border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setQuestionTab('linked')}
+                      className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={creatingQuestion}
+                      className="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                    >
+                      {creatingQuestion && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <span>Save & Link to Test</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-200 bg-white flex items-center justify-between">
+              <span className="text-xs text-gray-500">
+                {testQuestions.length} question(s) attached to this test
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsManageQuestionsOpen(false)}
+                className="px-4 py-2 text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- CREATE / EDIT TEST MODAL --- */}
       {(isCreateOpen || isEditOpen) && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-bold text-gray-900">{isEditOpen ? 'Edit Test' : 'Create New Test'}</h3>
-              <button onClick={() => { setIsCreateOpen(false); setIsEditOpen(false); }} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  setIsEditOpen(false);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
                 <Loader2 className="w-5 h-5 hidden" />
                 <span className="text-lg font-bold">&times;</span>
               </button>
             </div>
             <form onSubmit={isEditOpen ? handleEdit : handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title <span className="text-red-500">*</span></label>
-                <input 
-                  type="text" 
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
                   required
-                  value={form.title} 
-                  onChange={e => setForm({...form, title: e.target.value})}
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subject <span className="text-red-500">*</span></label>
-                <select 
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Subject <span className="text-red-500">*</span>
+                </label>
+                <select
                   required
-                  value={form.subject_id} 
-                  onChange={e => setForm({...form, subject_id: e.target.value})}
+                  value={form.subject_id}
+                  onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
                 >
-                  <option value="" disabled>Select a subject</option>
+                  <option value="" disabled>
+                    Select a subject
+                  </option>
                   {subjects.map((sub: any) => (
-                    <option key={sub.id} value={sub.id}>{sub.name}</option>
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </option>
                   ))}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Duration (m)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="1"
-                    value={form.duration} 
-                    onChange={e => setForm({...form, duration: Number(e.target.value)})}
+                    value={form.duration}
+                    onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">No. of Questions</label>
-                  <input 
-                    type="number" 
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Target Questions</label>
+                  <input
+                    type="number"
                     min="0"
-                    value={form.questions_count} 
-                    onChange={e => setForm({...form, questions_count: Number(e.target.value)})}
+                    value={form.questions_count}
+                    onChange={(e) => setForm({ ...form, questions_count: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Total Marks</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="1"
-                    value={form.total_marks} 
-                    onChange={e => setForm({...form, total_marks: Number(e.target.value)})}
+                    value={form.total_marks}
+                    onChange={(e) => setForm({ ...form, total_marks: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Pass Marks</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="0"
-                    value={form.passing_marks} 
-                    onChange={e => setForm({...form, passing_marks: Number(e.target.value)})}
+                    value={form.passing_marks}
+                    onChange={(e) => setForm({ ...form, passing_marks: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
               </div>
-              
+
               <div className="flex gap-6 pt-2">
                 <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={form.is_published} 
-                    onChange={e => setForm({...form, is_published: e.target.checked})}
+                  <input
+                    type="checkbox"
+                    checked={form.is_published}
+                    onChange={(e) => setForm({ ...form, is_published: e.target.checked })}
                     className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                   />
                   Publish Immediately
@@ -357,26 +1194,44 @@ export default function TestsPage() {
               </div>
 
               <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
-                <button type="button" onClick={() => { setIsCreateOpen(false); setIsEditOpen(false); }} className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-                <button type="submit" disabled={submitting} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2">
-                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />} {isEditOpen ? 'Save Changes' : 'Create Test'}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreateOpen(false);
+                    setIsEditOpen(false);
+                  }}
+                  className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}{' '}
+                  {isEditOpen ? 'Save Changes' : 'Create Test'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-      {/* View Modal */}
+
+      {/* --- PREVIEW MODAL --- */}
       {isViewOpen && viewData && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-lg max-w-lg w-full p-6 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-bold text-gray-900">Test Preview</h3>
-              <button onClick={() => setIsViewOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button
+                onClick={() => setIsViewOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="space-y-6">
               <div className="p-4 bg-indigo-50 rounded-lg flex items-center gap-4">
                 <div className="w-12 h-12 rounded-lg bg-white shadow-sm flex items-center justify-center text-indigo-600">
@@ -384,7 +1239,9 @@ export default function TestsPage() {
                 </div>
                 <div>
                   <h4 className="text-lg font-bold text-gray-900">{viewData.title || viewData.name}</h4>
-                  <p className="text-sm text-gray-500">ID: #{viewData.id}</p>
+                  <p className="text-sm text-gray-500">
+                    ID: #{viewData.id} &bull; {getSubjectName(viewData.subject_id)}
+                  </p>
                 </div>
               </div>
 
@@ -407,17 +1264,37 @@ export default function TestsPage() {
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Passing Marks</p>
-                  <p className="text-sm font-medium text-gray-900">{viewData.passing_marks || 0} / {viewData.total_marks || 0}</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {viewData.passing_marks || 0} / {viewData.total_marks || 0}
+                  </p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Questions</p>
-                  <p className="text-sm font-medium text-gray-900">{viewData.total_questions || viewData.questions_count || 0}</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {viewData.total_questions || viewData.questions_count || 0}
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="pt-4 flex justify-end mt-6 border-t border-gray-100">
-              <button type="button" onClick={() => setIsViewOpen(false)} className="px-4 py-2 bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition-colors">Close Preview</button>
+            <div className="pt-4 flex justify-between mt-6 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsViewOpen(false);
+                  openManageQuestionsModal(viewData);
+                }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-xs transition-colors shadow-xs"
+              >
+                Manage Questions
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsViewOpen(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition-colors text-xs"
+              >
+                Close Preview
+              </button>
             </div>
           </div>
         </div>
