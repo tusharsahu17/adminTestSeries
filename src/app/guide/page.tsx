@@ -79,19 +79,22 @@ export default function GuidePage() {
           </section>
 
           <section className="guide-section" id="exams">
-            <h2>2. Exams → Subjects</h2>
-            <p>An Exam is the top-level category, such as CGPSC, JEE or NEET.</p>
-            <div className="guide-grid">
+            <h2>2. Exams → Subjects (Optional)</h2>
+            <p>An Exam is an <strong>optional grouping</strong>, such as CGPSC, JEE or NEET. You do <strong>not</strong> need to create an exam if you just want to conduct tests.</p>
+            <div className="guide-note" style={{ background: '#ecfdf5', borderColor: '#10b981', color: '#065f46' }}>
+              <b>💡 Fast Flow Tip:</b> If you only want to create and conduct a test, you can completely skip creating an Exam! Tests connect directly to Subjects. Students will still see the test in their Dashboard and Available Tests tab.
+            </div>
+            <div className="guide-grid" style={{ marginTop: '16px' }}>
               <div className="guide-card">
-                <h3>📚 Exam</h3>
-                <p>Example: <b>CGPSC</b>. Contains multiple subjects.</p>
+                <h3>📚 Exam (Optional)</h3>
+                <p>Example: <b>CGPSC</b>. Optional folder to group subjects together.</p>
               </div>
               <div className="guide-card">
-                <h3>📖 Subject</h3>
-                <p>Examples: History, Geography, Polity, Economics. A subject can potentially be used by multiple exams.</p>
+                <h3>📖 Subject (Required)</h3>
+                <p>Examples: History, Geography, Polity, Economics. Tests belong directly to subjects.</p>
               </div>
             </div>
-            <p><b>Database:</b> <code className="guide-code">exams</code> → <code className="guide-code">exam_subjects</code> → <code className="guide-code">subjects</code> (Many-to-Many)</p>
+            <p style={{ marginTop: '14px' }}><b>Database:</b> <code className="guide-code">exams</code> → <code className="guide-code">exam_subjects</code> → <code className="guide-code">subjects</code> (Many-to-Many)</p>
           </section>
 
           <section className="guide-section" id="tests">
@@ -351,6 +354,7 @@ Results → Test Leaderboard → Series Leaderboard → Overall/Weekly/Monthly`}
 
           <section className="guide-section" id="faq">
             <h2>11. Quick FAQ</h2>
+            <details className="guide-details" open><summary className="guide-summary">Do I need to create an Exam to conduct a Test? Will it work on the User Panel?</summary><p><strong>No Exam needed!</strong> A test connects directly to a Subject (<code className="guide-code">tests.subject_id</code>). When you create a Test and mark it <em>Published</em>, it immediately appears on the user panel under <strong>Available Tests</strong> and the student's <strong>Dashboard</strong>. Students can start the test, submit answers, and view their scorecards without an Exam.</p></details>
             <details className="guide-details"><summary className="guide-summary">Can one Exam have multiple Subjects?</summary><p>Yes. Exams and Subjects use the <code className="guide-code">exam_subjects</code> junction table.</p></details>
             <details className="guide-details"><summary className="guide-summary">Can one Subject have multiple Tests?</summary><p>Yes. Each Test has a <code className="guide-code">subject_id</code>.</p></details>
             <details className="guide-details"><summary className="guide-summary">Can one Test have multiple Questions?</summary><p>Yes. Questions contain a <code className="guide-code">test_id</code>.</p></details>
