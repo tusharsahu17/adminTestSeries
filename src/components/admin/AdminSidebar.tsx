@@ -32,6 +32,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/tests', label: 'Tests', icon: '📝' },
       { href: '/admin/questions', label: 'Question Bank', icon: '❓' },
       { href: '/admin/subjects', label: 'Subjects', icon: '📚' },
+      { href: '/admin/previous-year-papers', label: 'Previous Year Papers', icon: '📄' },
       { href: '/admin/results', label: 'Results', icon: '📊' },
       { href: '/admin/leaderboards', label: 'Leaderboards', icon: '🏆' },
     ],

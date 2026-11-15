@@ -53,4 +53,17 @@ export const ENDPOINTS = {
   ADMIN_USER_RESET_PASSWORD: (userId: string | number) => `/api/admin/users/${userId}/reset-password`,
   ADMIN_USER_PROFILE: (userId: string | number) => `/api/admin/users/${userId}/profile`,
   ADMIN_USER_SUBSCRIPTION: (userId: string | number) => `/api/admin/users/${userId}/subscription`,
+
+  // PDF Endpoints
+  PDFS: '/api/pdfs',
+  ADMIN_PDFS: '/api/admin/pdfs',
+  PDF_DETAIL: (id: string | number) => `/api/pdfs/${id}`,
+  PDF_DOWNLOAD: (id: string | number) => `/api/pdfs/${id}/download`,
+  PDF_VIEW: (id: string | number) => `/api/pdfs/${id}/view`,
+
+  // PDF Categories
+  PDF_CATEGORIES: '/api/pdf-categories',
+  ADMIN_PDF_CATEGORIES: '/api/admin/pdf-categories',
+  PDF_CATEGORY_DETAIL: (id: string | number) => `/api/pdf-categories/${id}`,
+  PDF_CATEGORY_PDFS: (id: string | number) => `/api/pdf-categories/${id}/pdfs`,
 };

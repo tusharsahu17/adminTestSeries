@@ -4,6 +4,16 @@ import { enrollmentService } from './admin/enrollmentService';
 import { paymentService } from './admin/paymentService';
 import { subscriptionService } from './admin/subscriptionService';
 import { userService } from './admin/userService';
+import { pdfService } from './admin/pdfService';
+import type {
+  CreatePdfCategoryPayload,
+  PdfCategory,
+  PdfDocument,
+  PdfFilterParams,
+  UpdatePdfCategoryPayload,
+  UpdatePdfPayload,
+  UploadPdfPayload,
+} from '../types/admin/pdf';
 import type {
   DashboardQueryParams,
   RevenueAnalyticsParams,
@@ -308,5 +318,23 @@ export const adminService = {
   },
   getOverallLeaderboard: async () => {
     return await getData('/api/admin/leaderboards/overall');
-  }
+  },
+
+  // PDFs & Previous Year Papers
+  uploadPdf: (payload: UploadPdfPayload) => pdfService.uploadPdf(payload),
+  getPdfs: (params?: PdfFilterParams) => pdfService.getPdfs(params),
+  getPdfById: (id: string | number) => pdfService.getPdfById(id),
+  updatePdf: (id: string | number, payload: UpdatePdfPayload) => pdfService.updatePdf(id, payload),
+  deletePdf: (id: string | number) => pdfService.deletePdf(id),
+  getPdfCategories: () => pdfService.getPdfCategories(),
+  getPdfCategoryById: (id: string | number) => pdfService.getPdfCategoryById(id),
+  getPdfCategoryPdfs: (id: string | number) => pdfService.getPdfCategoryPdfs(id),
+  createPdfCategory: (data: CreatePdfCategoryPayload) => pdfService.createPdfCategory(data),
+  updatePdfCategory: (id: string | number, data: UpdatePdfCategoryPayload) =>
+    pdfService.updatePdfCategory(id, data),
+  deletePdfCategory: (id: string | number) => pdfService.deletePdfCategory(id),
+  getPdfViewUrl: (id: string | number) => pdfService.getPdfViewUrl(id),
+  getPdfDownloadUrl: (id: string | number) => pdfService.getPdfDownloadUrl(id),
+  downloadPdfFile: (id: string | number, filename?: string) => pdfService.downloadPdfFile(id, filename),
+  fetchPdfBlob: (id: string | number, action?: 'view' | 'download') => pdfService.fetchPdfBlob(id, action),
 };
