@@ -9,7 +9,6 @@ import {
   ArrowLeft,
   Award,
   BarChart3,
-  BookOpen,
   CheckCircle2,
   Clock,
   CreditCard,
@@ -34,7 +33,6 @@ import UserActivityTab from '../../../../components/admin/users/UserActivityTab'
 import UserAnalyticsTab from '../../../../components/admin/users/UserAnalyticsTab';
 import UserPaymentsTab from '../../../../components/admin/users/UserPaymentsTab';
 import UserTestHistoryTab from '../../../../components/admin/users/UserTestHistoryTab';
-import UserTestSeriesTab from '../../../../components/admin/users/UserTestSeriesTab';
 import { adminService } from '../../../../services/adminService';
 import type {
   UserActivityItem,
@@ -57,7 +55,6 @@ type UserTab =
   | 'overview'
   | 'analytics'
   | 'test-history'
-  | 'test-series'
   | 'payments'
   | 'activity';
 
@@ -65,7 +62,6 @@ const TABS: Array<{ id: UserTab; label: string; icon: React.ReactNode }> = [
   { id: 'overview', label: 'Overview', icon: <UserCheck className="w-4 h-4" /> },
   { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-4 h-4" /> },
   { id: 'test-history', label: 'Test History', icon: <History className="w-4 h-4" /> },
-  { id: 'test-series', label: 'Test Series', icon: <BookOpen className="w-4 h-4" /> },
   { id: 'payments', label: 'Payments', icon: <CreditCard className="w-4 h-4" /> },
   { id: 'activity', label: 'Activity & Logins', icon: <Activity className="w-4 h-4" /> },
 ];
@@ -521,10 +517,10 @@ function UserDetailsContent() {
               accentClass="bg-emerald-50 text-emerald-600"
             />
             <StatCard
-              title="Enrolled Series"
-              value={formatCompactNumber(quickStats.enrolledSeriesCount)}
-              subtitle={`${formatCompactNumber(quickStats.activeSeriesCount)} active subscriptions`}
-              icon={<BookOpen className="w-5 h-5" />}
+              title="Subscriptions"
+              value={formatCompactNumber(quickStats.activeSeriesCount)}
+              subtitle={`${formatCompactNumber(quickStats.enrolledSeriesCount)} total plan records`}
+              icon={<Award className="w-5 h-5" />}
               accentClass="bg-violet-50 text-violet-600"
             />
             <StatCard
@@ -761,10 +757,6 @@ function UserDetailsContent() {
       {activeTab === 'analytics' && <UserAnalyticsTab userId={userId} />}
 
       {activeTab === 'test-history' && <UserTestHistoryTab userId={userId} />}
-
-      {activeTab === 'test-series' && (
-        <UserTestSeriesTab userId={userId} onDataChange={fetchOverview} />
-      )}
 
       {activeTab === 'payments' && <UserPaymentsTab userId={userId} />}
 

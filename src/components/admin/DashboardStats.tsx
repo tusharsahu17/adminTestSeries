@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Activity,
-  BookOpen,
+  Calendar,
   ClipboardCheck,
   FileText,
   HelpCircle,
@@ -115,39 +115,28 @@ export default function DashboardStats({ overview, compact = false }: DashboardS
           accentClass="bg-blue-50 text-blue-600"
         />
         <StatCard
-          title="Test Series"
-          value={formatCompactNumber(overview.totalTestSeries)}
-          subtitle={`+${formatCompactNumber(overview.testSeriesAddedThisMonth)} added this month`}
-          icon={<BookOpen className="w-5 h-5" />}
+          title="Total Tests"
+          value={formatCompactNumber(overview.totalTests)}
+          subtitle={`${formatCompactNumber(overview.publishedTests)} published`}
+          icon={<FileText className="w-5 h-5" />}
           accentClass="bg-violet-50 text-violet-600"
+          badges={[
+            {
+              label: 'Published',
+              value: formatCompactNumber(overview.publishedTests),
+              className: 'bg-emerald-50 text-emerald-700',
+            },
+            {
+              label: 'Draft',
+              value: formatCompactNumber(overview.draftTests),
+              className: 'bg-gray-100 text-gray-700',
+            },
+          ]}
         />
       </div>
 
       {!compact && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard
-            title="Total Tests"
-            value={formatCompactNumber(overview.totalTests)}
-            icon={<FileText className="w-5 h-5" />}
-            accentClass="bg-amber-50 text-amber-600"
-            badges={[
-              {
-                label: 'Published',
-                value: formatCompactNumber(overview.publishedTests),
-                className: 'bg-emerald-50 text-emerald-700',
-              },
-              {
-                label: 'Draft',
-                value: formatCompactNumber(overview.draftTests),
-                className: 'bg-gray-100 text-gray-700',
-              },
-              {
-                label: 'Scheduled',
-                value: formatCompactNumber(overview.scheduledTests),
-                className: 'bg-amber-50 text-amber-700',
-              },
-            ]}
-          />
           <StatCard
             title="Question Bank"
             value={formatCompactNumber(overview.totalQuestions)}
@@ -161,6 +150,13 @@ export default function DashboardStats({ overview, compact = false }: DashboardS
             subtitle="Active within the last 30 days"
             icon={<Activity className="w-5 h-5" />}
             accentClass="bg-rose-50 text-rose-600"
+          />
+          <StatCard
+            title="Scheduled Tests"
+            value={formatCompactNumber(overview.scheduledTests)}
+            subtitle="Upcoming scheduled tests"
+            icon={<Calendar className="w-5 h-5" />}
+            accentClass="bg-amber-50 text-amber-600"
           />
         </div>
       )}

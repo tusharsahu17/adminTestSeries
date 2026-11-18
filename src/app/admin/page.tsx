@@ -15,12 +15,10 @@ import {
 } from 'lucide-react';
 import AnalyticsChart from '../../components/admin/AnalyticsChart';
 import DashboardStats from '../../components/admin/DashboardStats';
-import SeriesPerformancePanel from '../../components/admin/SeriesPerformancePanel';
 import { adminService } from '../../services/adminService';
 import { FullDashboardData } from '../../types/admin/analytics';
 import {
   formatCompactNumber,
-  formatDate,
   formatDurationSeconds,
   formatINR,
   formatPercent,
@@ -35,7 +33,6 @@ export default function AdminDashboard() {
 
   const [testDays, setTestDays] = useState(7);
   const [revenueMonths, setRevenueMonths] = useState(6);
-  const [seriesLimit, setSeriesLimit] = useState(5);
 
   const loadDashboardData = useCallback(async () => {
     const data = await adminService.getFullDashboard({
@@ -44,10 +41,9 @@ export default function AdminDashboard() {
       studentMonths: 12,
       testDays,
       revenueMonths,
-      seriesLimit,
     });
     return data;
-  }, [testDays, revenueMonths, seriesLimit]);
+  }, [testDays, revenueMonths]);
 
   const handleRefresh = useCallback(
     async (isRefresh = true) => {
@@ -107,7 +103,7 @@ export default function AdminDashboard() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
           <p className="text-sm text-gray-500">
-            Live overview of students, tests, test series performance, revenue, and learning outcomes.
+            Live overview of students, exams, subjects, tests, revenue, and learning outcomes.
           </p>
         </div>
 
@@ -137,19 +133,6 @@ export default function AdminDashboard() {
           >
             <option value={6}>Revenue: 6 months</option>
             <option value={12}>Revenue: 12 months</option>
-          </select>
-
-          <select
-            value={seriesLimit}
-            onChange={(e) => {
-              setRefreshing(true);
-              setSeriesLimit(Number(e.target.value));
-            }}
-            aria-label="Top series limit"
-            className="px-3 py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-700"
-          >
-            <option value={5}>Top 5 Series</option>
-            <option value={10}>Top 10 Series</option>
           </select>
 
           <button
@@ -249,10 +232,7 @@ export default function AdminDashboard() {
             />
           </div>
 
-          {/* 3. Test Series Performance & Highlights */}
-          <SeriesPerformancePanel data={dashboard.testSeriesPerformance} compact />
-
-          {/* 4. Student Pulse, Performance & Revenue/Recently Published */}
+          {/* 3. Student Pulse, Performance & Test Repository Status */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* Student Snapshot */}
             <div className="bg-white rounded-xl border border-gray-200/80 p-5 shadow-xs space-y-4">
@@ -399,28 +379,37 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="pt-2 border-t border-gray-100">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-                  Recently Published Series
-                </p>
-                {dashboard.testSeriesPerformance.recentlyPublishedSeries.length === 0 ? (
-                  <p className="text-xs text-gray-400">No published series yet.</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {dashboard.testSeriesPerformance.recentlyPublishedSeries.slice(0, 3).map((s, i) => (
-                      <div
-                        key={`pub-${s.id ?? s.title}-${i}`}
-                        className="flex items-center justify-between text-xs py-1"
-                      >
-                        <span className="font-medium text-gray-800 truncate max-w-[170px]">
-                          {s.title}
-                        </span>
-                        <span className="text-gray-500">
-                          {s.publishedAt ? formatDate(s.publishedAt) : 'Published'}
-                        </span>
-                      </div>
-                    ))}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Test Repository
+                  </p>
+                  <Link
+                    href="/admin/tests"
+                    className="text-[11px] font-semibold text-indigo-600 hover:underline inline-flex items-center gap-0.5"
+                  >
+                    Manage Tests →
+                  </Link>
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between py-1 border-b border-gray-50">
+                    <span className="text-gray-500">Published Tests</span>
+                    <span className="font-bold text-emerald-600">
+                      {formatCompactNumber(dashboard.overview.publishedTests)}
+                    </span>
                   </div>
-                )}
+                  <div className="flex items-center justify-between py-1 border-b border-gray-50">
+                    <span className="text-gray-500">Draft Tests</span>
+                    <span className="font-bold text-amber-600">
+                      {formatCompactNumber(dashboard.overview.draftTests)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-gray-500">Scheduled Tests</span>
+                    <span className="font-bold text-indigo-600">
+                      {formatCompactNumber(dashboard.overview.scheduledTests)}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

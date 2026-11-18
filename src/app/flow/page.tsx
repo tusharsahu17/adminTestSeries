@@ -68,23 +68,23 @@ export default function FlowPage() {
     },
     {
       id: 5,
-      title: 'Test Series',
-      description: 'Create a bundled test series under a Category.',
-      example: 'JEE Mains Premium Test Series',
-      icon: ListPlus,
-      color: 'bg-rose-100 text-rose-600',
-      border: 'border-rose-200',
-      href: '/admin/test-series',
+      title: 'Direct Test Attempts',
+      description: 'Students discover and attempt tests directly under Subjects and Exams without series barriers.',
+      example: 'Direct test attempt via /api/student/tests/:id/start',
+      icon: CheckCircle2,
+      color: 'bg-emerald-100 text-emerald-600',
+      border: 'border-emerald-200',
+      href: '/admin/results',
     },
     {
       id: 6,
-      title: 'Link Tests to Series',
-      description: 'Select tests and add them to the Test Series in a specific order.',
-      example: 'Add Physics Mock Test 1 to Premium Series',
-      icon: Layers,
+      title: 'Results & Leaderboards',
+      description: 'Automatic scoring, answer keys, subject leaderboards, and detailed analytics.',
+      example: 'Leaderboard computed directly by joining tests with subjects & exams',
+      icon: Sparkles,
       color: 'bg-orange-100 text-orange-600',
       border: 'border-orange-200',
-      href: '/admin/test-series',
+      href: '/admin/leaderboards',
     },
   ];
 
@@ -297,25 +297,25 @@ export default function FlowPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 flex items-center gap-1">
-                    <FolderTree className="w-3.5 h-3.5" /> Flow 2: Complete Exam & Test Series Package Flow
+                    <FolderTree className="w-3.5 h-3.5" /> Flow 2: Complete Exams & Subjects Hierarchy
                   </span>
                   <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                    Original Architecture
+                    Direct Architecture
                   </span>
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900 mt-1">
-                  Full Multi-Tier Exam & Test Series Hierarchy
+                  Exams &rarr; Subjects &rarr; Tests &rarr; Questions
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500">
-                  Use this when organizing complex competitive exam preparations (like CGPSC, JEE, NEET) with multi-subject packages, paid access, and test bundles.
+                  Organize competitive exams (like CGPSC, JEE, NEET) into structured subjects and directly publish tests for students.
                 </p>
               </div>
               <div className="shrink-0 flex items-center gap-2">
                 <Link
-                  href="/admin/test-series"
+                  href="/admin/exams"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5"
                 >
-                  <ListPlus className="w-4 h-4" /> Go to Series
+                  <BookOpen className="w-4 h-4" /> Go to Exams
                 </Link>
               </div>
             </div>
@@ -463,14 +463,14 @@ export default function FlowPage() {
                   <td className="py-3 px-4 text-emerald-600 font-semibold">✓ Instant scorecards & analytics</td>
                 </tr>
                 <tr className="hover:bg-slate-50/50">
-                  <td className="py-3 px-4 font-semibold text-slate-900">Student "My Exams" Page</td>
-                  <td className="py-3 px-4 text-slate-500">Not listed (students use Available Tests)</td>
-                  <td className="py-3 px-4 text-emerald-600 font-semibold">✓ Listed under Exam card</td>
+                  <td className="py-3 px-4 font-semibold text-slate-900">Student Test Discovery</td>
+                  <td className="py-3 px-4 text-emerald-600 font-semibold">✓ Direct access under Subjects</td>
+                  <td className="py-3 px-4 text-emerald-600 font-semibold">✓ Direct access under Exams &rarr; Subjects</td>
                 </tr>
                 <tr className="hover:bg-slate-50/50">
-                  <td className="py-3 px-4 font-semibold text-slate-900">Student "My Test Series" Page</td>
-                  <td className="py-3 px-4 text-slate-500">Not bundled into series</td>
-                  <td className="py-3 px-4 text-emerald-600 font-semibold">✓ Listed inside Test Series package</td>
+                  <td className="py-3 px-4 font-semibold text-slate-900">Attempt Prerequisites</td>
+                  <td className="py-3 px-4 text-emerald-600 font-semibold">✓ No test series enrollment required</td>
+                  <td className="py-3 px-4 text-emerald-600 font-semibold">✓ Direct attempt creation (/api/student/tests/:id/start)</td>
                 </tr>
                 <tr className="hover:bg-slate-50/50">
                   <td className="py-3 px-4 font-semibold text-slate-900">Best For</td>
@@ -540,7 +540,7 @@ export default function FlowPage() {
           <div className="space-y-1 text-center sm:text-left">
             <h3 className="text-lg sm:text-xl font-bold">Ready to take action?</h3>
             <p className="text-slate-400 text-xs sm:text-sm">
-              Create a quick test right away, or build a complete exam series bundle.
+              Create tests under subjects, organize exams, and publish directly for students.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -548,13 +548,13 @@ export default function FlowPage() {
               href="/admin/tests"
               className="px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-sm transition-colors flex items-center gap-1.5"
             >
-              <Zap className="w-4 h-4" /> Quick Test (Flow 1)
+              <Zap className="w-4 h-4" /> Manage Tests
             </Link>
             <Link
-              href="/admin/test-series"
+              href="/admin/exams"
               className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition-colors flex items-center gap-1.5"
             >
-              <FolderTree className="w-4 h-4" /> Exam Series (Flow 2)
+              <FolderTree className="w-4 h-4" /> Manage Exams
             </Link>
             <Link
               href="/guide"

@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "localhost",
     "192.168.1.52",
+    "192.168.68.46",
+    "192.168.1.111"
   ],
   async rewrites() {
     return [

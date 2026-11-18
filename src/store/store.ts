@@ -2,7 +2,6 @@ import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../app/auth/authSlice';
 import quizReducer from './slices/quizSlice';
 import userReducer from './slices/userSlice';
-import testSeriesReducer from './slices/testSeriesSlice';
 import testReducer from './slices/testSlice';
 import questionReducer from './slices/questionSlice';
 import subjectReducer from './slices/subjectSlice';
@@ -23,7 +22,6 @@ export const makeStore = () => {
       auth: authReducer,
       quizzes: quizReducer,
       users: userReducer,
-      testSeries: testSeriesReducer,
       tests: testReducer,
       questions: questionReducer,
       subjects: subjectReducer,

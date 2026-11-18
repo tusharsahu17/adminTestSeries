@@ -199,30 +199,30 @@ export const adminService = {
     return await deleteData(`/api/exams/${examId}/subjects/${subjectId}`);
   },
   
-  // Test Series
-  getTestSeries: async (params?: any) => {
-    return await getData('/api/admin/test-series', params);
+  // Test Series (Legacy / Fallback - test series removed in backend)
+  getTestSeries: async (_params?: any) => {
+    return { data: { testSeries: [] }, testSeries: [] };
   },
-  getSeriesDetails: async (id: string) => {
-    return await getData(`/api/admin/test-series/${id}`);
+  getSeriesDetails: async (_id: string) => {
+    return { data: null };
   },
-  createTestSeries: async (data: any) => {
-    return await postData('/api/admin/test-series', data);
+  createTestSeries: async (_data: any) => {
+    return { data: null };
   },
-  updateTestSeries: async (id: string, data: any) => {
-    return await putData(`/api/admin/test-series/${id}`, data);
+  updateTestSeries: async (_id: string, _data: any) => {
+    return { data: null };
   },
-  deleteTestSeries: async (id: string) => {
-    return await deleteData(`/api/admin/test-series/${id}`);
+  deleteTestSeries: async (_id: string) => {
+    return { data: null };
   },
-  addTestToSeries: async (id: string, testId: string, order: number) => {
-    return await postData(`/api/admin/test-series/${id}/tests`, { test_id: testId, order });
+  addTestToSeries: async (_id: string, _testId: string, _order: number) => {
+    return { data: null };
   },
-  reorderTestSeriesTests: async (id: string, orderedTestIds: number[]) => {
-    return await putData(`/api/admin/test-series/${id}/tests/reorder`, { ordered_test_ids: orderedTestIds });
+  reorderTestSeriesTests: async (_id: string, _orderedTestIds: number[]) => {
+    return { data: null };
   },
-  syncSeriesTests: async (id: string, testIds: number[]) => {
-    return await putData(`/api/admin/test-series/${id}/tests/sync`, { test_ids: testIds });
+  syncSeriesTests: async (_id: string, _testIds: number[]) => {
+    return { data: null };
   },
 
   // Categories

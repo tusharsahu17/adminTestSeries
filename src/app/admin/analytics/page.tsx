@@ -6,7 +6,6 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
   BarChart3,
-  BookOpen,
   FileText,
   IndianRupee,
   Loader2,
@@ -21,7 +20,6 @@ import {
   TestAnalyticsPanel,
 } from '../../../components/admin/AnalyticsSectionPanels';
 import DashboardStats from '../../../components/admin/DashboardStats';
-import SeriesPerformancePanel from '../../../components/admin/SeriesPerformancePanel';
 import { adminService } from '../../../services/adminService';
 import {
   OverviewStats,
@@ -29,7 +27,6 @@ import {
   StudentAnalytics,
   StudentPerformanceAnalytics,
   TestAnalytics,
-  TestSeriesPerformance,
 } from '../../../types/admin/analytics';
 import { getErrorMessage } from '../../../utils/formatters';
 
@@ -37,7 +34,6 @@ type AnalyticsTab =
   | 'overview'
   | 'students'
   | 'tests'
-  | 'test-series'
   | 'revenue'
   | 'student-performance';
 
@@ -45,7 +41,6 @@ const TABS: Array<{ id: AnalyticsTab; label: string; icon: React.ReactNode }> = 
   { id: 'overview', label: 'Overview', icon: <BarChart3 className="w-4 h-4" /> },
   { id: 'students', label: 'Students', icon: <Users className="w-4 h-4" /> },
   { id: 'tests', label: 'Tests', icon: <FileText className="w-4 h-4" /> },
-  { id: 'test-series', label: 'Test Series', icon: <BookOpen className="w-4 h-4" /> },
   { id: 'revenue', label: 'Revenue', icon: <IndianRupee className="w-4 h-4" /> },
   {
     id: 'student-performance',
@@ -72,7 +67,6 @@ function AnalyticsContent() {
   const [overview, setOverview] = useState<OverviewStats | null>(null);
   const [studentAnalytics, setStudentAnalytics] = useState<StudentAnalytics | null>(null);
   const [testAnalytics, setTestAnalytics] = useState<TestAnalytics | null>(null);
-  const [testSeriesPerf, setTestSeriesPerf] = useState<TestSeriesPerformance | null>(null);
   const [revenueAnalytics, setRevenueAnalytics] = useState<RevenueAnalytics | null>(null);
   const [studentPerf, setStudentPerf] = useState<StudentPerformanceAnalytics | null>(null);
 
@@ -96,11 +90,6 @@ function AnalyticsContent() {
         return {
           tab: 'tests' as const,
           data: await adminService.getTestAnalytics({ days: testDays }),
-        };
-      case 'test-series':
-        return {
-          tab: 'test-series' as const,
-          data: await adminService.getTestSeriesPerformance(),
         };
       case 'revenue':
         return {
@@ -126,9 +115,6 @@ function AnalyticsContent() {
           break;
         case 'tests':
           setTestAnalytics(result.data);
-          break;
-        case 'test-series':
-          setTestSeriesPerf(result.data);
           break;
         case 'revenue':
           setRevenueAnalytics(result.data);
@@ -312,10 +298,6 @@ function AnalyticsContent() {
                 </select>
               }
             />
-          )}
-
-          {activeTab === 'test-series' && testSeriesPerf && (
-            <SeriesPerformancePanel data={testSeriesPerf} />
           )}
 
           {activeTab === 'revenue' && revenueAnalytics && (
