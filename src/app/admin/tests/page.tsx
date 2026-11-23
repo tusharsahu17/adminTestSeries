@@ -26,6 +26,10 @@ import Link from 'next/link';
 export default function TestsPage() {
   const [tests, setTests] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [exams, setExams] = useState<any[]>([]);
+  const [selectedExamFilter, setSelectedExamFilter] = useState<string>('ALL');
+  const [examSubjectsMap, setExamSubjectsMap] = useState<Record<string, any[]>>({});
+  const [loadingExamSubjects, setLoadingExamSubjects] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Search state
@@ -52,7 +56,21 @@ export default function TestsPage() {
 
   // Sub-modal: Quick Create Question during Create / Edit Test
   const [isQuickCreateQuestionOpen, setIsQuickCreateQuestionOpen] = useState(false);
-  const [quickQuestionForm, setQuickQuestionForm] = useState({
+  const [quickQuestionForm, setQuickQuestionForm] = useState<{
+    question_text: string;
+    question_type: string;
+    marks: number | '';
+    negative_marks: number | '';
+    difficulty: string;
+    explanation: string;
+    topic: string;
+    options: {
+      option_text: string;
+      option_key: string;
+      is_correct: boolean;
+      display_order: number;
+    }[];
+  }>({
     question_text: '',
     question_type: 'MCQ',
     marks: 1,
@@ -83,7 +101,21 @@ export default function TestsPage() {
   const [addingFromBank, setAddingFromBank] = useState(false);
 
   // Dedicated modal new question form
-  const [newQuestionForm, setNewQuestionForm] = useState({
+  const [newQuestionForm, setNewQuestionForm] = useState<{
+    question_text: string;
+    question_type: string;
+    marks: number | '';
+    negative_marks: number | '';
+    difficulty: string;
+    explanation: string;
+    topic: string;
+    options: {
+      option_text: string;
+      option_key: string;
+      is_correct: boolean;
+      display_order: number;
+    }[];
+  }>({
     question_text: '',
     question_type: 'MCQ',
     marks: 1,
@@ -101,8 +133,18 @@ export default function TestsPage() {
   const [creatingQuestion, setCreatingQuestion] = useState(false);
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    title: string;
+    exam_id: string;
+    duration: number | '';
+    total_marks: number | '';
+    passing_marks: number | '';
+    subject_id: string;
+    is_published: boolean;
+    questions_count: number;
+  }>({
     title: '',
+    exam_id: '',
     duration: 60,
     total_marks: 100,
     passing_marks: 33,
@@ -115,6 +157,12 @@ export default function TestsPage() {
     if (!subjectId) return 'Unassigned';
     const sub = subjects.find((s) => String(s.id) === String(subjectId));
     return sub ? sub.name : `Subject #${subjectId}`;
+  };
+
+  const getExamName = (examId: string | number | undefined | null) => {
+    if (!examId) return null;
+    const exam = exams.find((e) => String(e.id) === String(examId));
+    return exam ? exam.name : `Exam #${examId}`;
   };
 
   const fetchTests = async () => {
@@ -140,9 +188,53 @@ export default function TestsPage() {
     }
   };
 
+  const fetchExams = async () => {
+    try {
+      const res = await adminService.getExams();
+      const data = res.data?.exams || res.data || res;
+      setExams(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to fetch exams:', err);
+    }
+  };
+
+  const handleExamChange = async (examId: string) => {
+    setForm((prev) => ({ ...prev, exam_id: examId, subject_id: '' }));
+    if (!examId) return;
+    if (examSubjectsMap[examId]) return;
+
+    setLoadingExamSubjects(true);
+    try {
+      const res = await adminService.getExamSubjects(examId);
+      const data = res?.subjects || res?.data?.subjects || res?.data || res;
+      setExamSubjectsMap((prev) => ({
+        ...prev,
+        [examId]: Array.isArray(data) ? data : [],
+      }));
+    } catch (err) {
+      console.error('Failed to load exam subjects:', err);
+    } finally {
+      setLoadingExamSubjects(false);
+    }
+  };
+
+  const availableSubjectsForModal =
+    form.exam_id && examSubjectsMap[form.exam_id]?.length
+      ? examSubjectsMap[form.exam_id]
+      : subjects;
+
+  const filteredTests = tests.filter((test) => {
+    if (selectedExamFilter === 'ALL') return true;
+    if (selectedExamFilter === 'UNASSIGNED') {
+      return !test.exam_id;
+    }
+    return String(test.exam_id || '') === String(selectedExamFilter);
+  });
+
   useEffect(() => {
     fetchTests();
     fetchSubjects();
+    fetchExams();
   }, [searchTerm]);
 
   // Keep questions_count in sync with stagedQuestions during create/edit
@@ -182,12 +274,16 @@ export default function TestsPage() {
     if (!form.title || !form.subject_id) return alert('Title and Subject are required');
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: any = {
         ...form,
         name: form.title,
+        exam_id: form.exam_id ? parseInt(form.exam_id, 10) : null,
         subject_id: parseInt(form.subject_id, 10),
         total_questions: stagedQuestions.length > 0 ? stagedQuestions.length : form.questions_count,
-        duration_minutes: form.duration,
+        duration_minutes: form.duration === '' ? 60 : Number(form.duration),
+        duration: form.duration === '' ? 60 : Number(form.duration),
+        total_marks: form.total_marks === '' ? 100 : Number(form.total_marks),
+        passing_marks: form.passing_marks === '' ? 33 : Number(form.passing_marks),
       };
       const res: any = await adminService.createTest(payload);
       const newTestId = res?.testId || res?.data?.testId || res?.id;
@@ -232,12 +328,16 @@ export default function TestsPage() {
       return alert('Title and Subject are required');
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: any = {
         ...form,
         name: form.title,
+        exam_id: form.exam_id ? parseInt(form.exam_id, 10) : null,
         subject_id: parseInt(form.subject_id, 10),
         total_questions: stagedQuestions.length,
-        duration_minutes: form.duration,
+        duration_minutes: form.duration === '' ? 60 : Number(form.duration),
+        duration: form.duration === '' ? 60 : Number(form.duration),
+        total_marks: form.total_marks === '' ? 100 : Number(form.total_marks),
+        passing_marks: form.passing_marks === '' ? 33 : Number(form.passing_marks),
       };
       await adminService.updateTest(selectedTestId, payload);
 
@@ -292,30 +392,23 @@ export default function TestsPage() {
     }
   };
 
-  const handleDuplicate = async (id: string | number) => {
-    if (confirm('Create a duplicate copy of this test?')) {
-      try {
-        await adminService.duplicateTest(id);
-        alert('Test duplicated successfully');
-        fetchTests();
-      } catch (err) {
-        console.error('Duplicate failed:', err);
-        alert('Failed to duplicate test');
-      }
-    }
-  };
-
   const openEditModal = async (item: any) => {
     setSelectedTestId(item.id);
+    const itemExamId = item.exam_id ? String(item.exam_id) : '';
     setForm({
       title: item.title || item.name || '',
-      duration: item.duration_minutes || item.duration || 60,
-      total_marks: item.total_marks || 100,
-      passing_marks: item.passing_marks || 33,
-      subject_id: item.subject_id || '',
+      exam_id: itemExamId,
+      duration: item.duration_minutes ?? item.duration ?? 60,
+      total_marks: item.total_marks ?? 100,
+      passing_marks: item.passing_marks ?? 33,
+      subject_id: item.subject_id ? String(item.subject_id) : '',
       is_published: !!item.is_published,
       questions_count: item.total_questions || item.questions_count || 0,
     });
+
+    if (itemExamId && !examSubjectsMap[itemExamId]) {
+      handleExamChange(itemExamId);
+    }
 
     // Load existing questions for this test into stagedQuestions
     try {
@@ -345,6 +438,7 @@ export default function TestsPage() {
   const resetForm = () => {
     setForm({
       title: '',
+      exam_id: '',
       duration: 60,
       total_marks: 100,
       passing_marks: 33,
@@ -374,6 +468,8 @@ export default function TestsPage() {
     }
     const newQuestion = {
       ...quickQuestionForm,
+      marks: quickQuestionForm.marks === '' ? 1 : Number(quickQuestionForm.marks),
+      negative_marks: quickQuestionForm.negative_marks === '' ? 0 : Number(quickQuestionForm.negative_marks),
       is_new_draft: true,
       id: `draft-${Date.now()}`,
     };
@@ -535,6 +631,8 @@ export default function TestsPage() {
       const subjectName = getSubjectName(activeTestForQuestions.subject_id);
       const payload = {
         ...newQuestionForm,
+        marks: newQuestionForm.marks === '' ? 1 : Number(newQuestionForm.marks),
+        negative_marks: newQuestionForm.negative_marks === '' ? 0 : Number(newQuestionForm.negative_marks),
         test_id: activeTestForQuestions.id,
         subject: subjectName,
       };
@@ -602,8 +700,8 @@ export default function TestsPage() {
       </header>
 
       <section className="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 overflow-hidden">
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between gap-4">
-          <div className="flex-1 max-w-md relative">
+        <div className="p-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex-1 min-w-[240px] max-w-md relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -612,6 +710,35 @@ export default function TestsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <label className="text-xs font-semibold text-gray-500 whitespace-nowrap">Filter Exam:</label>
+            <select
+              value={selectedExamFilter}
+              onChange={(e) => setSelectedExamFilter(e.target.value)}
+              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            >
+              <option value="ALL">All Exams ({tests.length})</option>
+              {exams.map((ex) => {
+                const count = tests.filter((t) => String(t.exam_id) === String(ex.id)).length;
+                return (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.name} ({count})
+                  </option>
+                );
+              })}
+              <option value="UNASSIGNED">Unassigned / General</option>
+            </select>
+            {selectedExamFilter !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => setSelectedExamFilter('ALL')}
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
+              >
+                Reset
+              </button>
+            )}
           </div>
         </div>
 
@@ -634,14 +761,14 @@ export default function TestsPage() {
                     <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mx-auto" />
                   </td>
                 </tr>
-              ) : tests.length === 0 ? (
+              ) : filteredTests.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-gray-500">
-                    No tests found.
+                    No tests found {selectedExamFilter !== 'ALL' ? 'for the selected exam' : ''}.
                   </td>
                 </tr>
               ) : (
-                tests.map((test) => (
+                filteredTests.map((test) => (
                   <tr key={test.id} className="hover:bg-gray-50/50">
                     <td className="py-3 px-5 text-sm text-gray-500">#{test.id}</td>
                     <td className="py-3 px-5">
@@ -651,10 +778,25 @@ export default function TestsPage() {
                         </div>
                         <div>
                           <p className="font-medium text-gray-900">{test.title || test.name}</p>
-                          <p className="text-xs text-gray-500">
-                            {getSubjectName(test.subject_id)} &bull; Passing: {test.passing_marks || 0}/
-                            {test.total_marks || 0}
-                          </p>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            {test.exam_id && getExamName(test.exam_id) ? (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                                {getExamName(test.exam_id)}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-gray-100 text-gray-500">
+                                All Exams
+                              </span>
+                            )}
+                            <span className="text-xs text-gray-400">&bull;</span>
+                            <span className="text-xs text-gray-600 font-medium">
+                              {getSubjectName(test.subject_id)}
+                            </span>
+                            <span className="text-xs text-gray-400">&bull;</span>
+                            <span className="text-xs text-gray-500">
+                              Passing: {test.passing_marks || 0}/{test.total_marks || 0}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -690,21 +832,14 @@ export default function TestsPage() {
                     </td>
                     <td className="py-3 px-5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button
+                        {/* <button
                           onClick={() => openManageQuestionsModal(test)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-xs"
                           title="Add / Manage Questions"
                         >
                           <HelpCircle className="w-3.5 h-3.5" />
                           <span>Questions</span>
-                        </button>
-                        <button
-                          onClick={() => handleDuplicate(test.id)}
-                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                          title="Duplicate Test"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
+                        </button> */}
                         <button
                           onClick={() => openViewModal(test)}
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
@@ -776,26 +911,64 @@ export default function TestsPage() {
                 />
               </div>
 
-              {/* Subject */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Subject <span className="text-red-500">*</span>
-                </label>
-                <select
-                  required
-                  value={form.subject_id}
-                  onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                >
-                  <option value="" disabled>
-                    Select a subject
-                  </option>
-                  {subjects.map((sub: any) => (
-                    <option key={sub.id} value={sub.id}>
-                      {sub.name}
+              {/* Target Exam & Subject Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Target Exam */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-gray-700">
+                      Target Exam <span className="text-red-500">*</span>
+                    </label>
+                    {loadingExamSubjects && (
+                      <span className="text-2xs text-indigo-600 flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Loading subjects...
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    required
+                    value={form.exam_id}
+                    onChange={(e) => handleExamChange(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                  >
+                    <option value="">Select an exam</option>
+                    {exams.map((exam: any) => (
+                      <option key={exam.id} value={exam.id}>
+                        {exam.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-2xs text-gray-400 mt-1">
+                    Relates this test specifically to this exam.
+                  </p>
+                </div>
+
+                {/* Subject */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Subject <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={form.subject_id}
+                    onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                  >
+                    <option value="" disabled>
+                      Select a subject
                     </option>
-                  ))}
-                </select>
+                    {availableSubjectsForModal.map((sub: any) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-2xs text-gray-400 mt-1">
+                    {form.exam_id && examSubjectsMap[form.exam_id]?.length
+                      ? `Showing ${examSubjectsMap[form.exam_id].length} subject(s) in this exam`
+                      : 'All available subjects'}
+                  </p>
+                </div>
               </div>
 
               {/* Numbers Grid */}
@@ -806,7 +979,11 @@ export default function TestsPage() {
                     type="number"
                     min="1"
                     value={form.duration}
-                    onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
+                      setForm({ ...form, duration: cleaned === '' ? '' : Number(cleaned) });
+                    }}
                     className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                   />
                 </div>
@@ -816,7 +993,11 @@ export default function TestsPage() {
                     type="number"
                     min="1"
                     value={form.total_marks}
-                    onChange={(e) => setForm({ ...form, total_marks: Number(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
+                      setForm({ ...form, total_marks: cleaned === '' ? '' : Number(cleaned) });
+                    }}
                     className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                   />
                 </div>
@@ -826,7 +1007,11 @@ export default function TestsPage() {
                     type="number"
                     min="0"
                     value={form.passing_marks}
-                    onChange={(e) => setForm({ ...form, passing_marks: Number(e.target.value) })}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
+                      setForm({ ...form, passing_marks: cleaned === '' ? '' : Number(cleaned) });
+                    }}
                     className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                   />
                 </div>
@@ -873,7 +1058,7 @@ export default function TestsPage() {
                       className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>+ New Question</span>
+                      <span>New Question</span>
                     </button>
                   </div>
                 </div>
@@ -1197,12 +1382,14 @@ export default function TestsPage() {
                     min="0"
                     step="0.5"
                     value={quickQuestionForm.marks}
-                    onChange={(e) =>
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
                       setQuickQuestionForm({
                         ...quickQuestionForm,
-                        marks: Number(e.target.value),
-                      })
-                    }
+                        marks: cleaned === '' ? '' : Number(cleaned),
+                      });
+                    }}
                     className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                   />
                 </div>
@@ -1213,12 +1400,14 @@ export default function TestsPage() {
                     min="0"
                     step="0.25"
                     value={quickQuestionForm.negative_marks}
-                    onChange={(e) =>
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
                       setQuickQuestionForm({
                         ...quickQuestionForm,
-                        negative_marks: Number(e.target.value),
-                      })
-                    }
+                        negative_marks: cleaned === '' ? '' : Number(cleaned),
+                      });
+                    }}
                     className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                   />
                 </div>
@@ -1291,6 +1480,14 @@ export default function TestsPage() {
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                    {activeTestForQuestions.exam_id && (
+                      <>
+                        <span>
+                          Exam: <strong>{getExamName(activeTestForQuestions.exam_id)}</strong>
+                        </span>
+                        <span>&bull;</span>
+                      </>
+                    )}
                     <span>
                       Subject: <strong>{getSubjectName(activeTestForQuestions.subject_id)}</strong>
                     </span>
@@ -1714,9 +1911,14 @@ export default function TestsPage() {
                         min="0"
                         step="0.5"
                         value={newQuestionForm.marks}
-                        onChange={(e) =>
-                          setNewQuestionForm({ ...newQuestionForm, marks: Number(e.target.value) })
-                        }
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
+                          setNewQuestionForm({
+                            ...newQuestionForm,
+                            marks: cleaned === '' ? '' : Number(cleaned),
+                          });
+                        }}
                         className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                       />
                     </div>
@@ -1727,12 +1929,14 @@ export default function TestsPage() {
                         min="0"
                         step="0.25"
                         value={newQuestionForm.negative_marks}
-                        onChange={(e) =>
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
                           setNewQuestionForm({
                             ...newQuestionForm,
-                            negative_marks: Number(e.target.value),
-                          })
-                        }
+                            negative_marks: cleaned === '' ? '' : Number(cleaned),
+                          });
+                        }}
                         className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                       />
                     </div>
@@ -1836,9 +2040,23 @@ export default function TestsPage() {
                 </div>
                 <div>
                   <h4 className="text-lg font-bold text-gray-900">{viewData.title || viewData.name}</h4>
-                  <p className="text-sm text-gray-500">
-                    ID: #{viewData.id} &bull; {getSubjectName(viewData.subject_id)}
-                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                    {viewData.exam_id && getExamName(viewData.exam_id) ? (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                        {getExamName(viewData.exam_id)}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-gray-100 text-gray-500">
+                        All Exams
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-400">&bull;</span>
+                    <span className="text-xs text-gray-600 font-medium">
+                      {getSubjectName(viewData.subject_id)}
+                    </span>
+                    <span className="text-xs text-gray-400">&bull;</span>
+                    <span className="text-xs text-gray-500">ID: #{viewData.id}</span>
+                  </div>
                 </div>
               </div>
 

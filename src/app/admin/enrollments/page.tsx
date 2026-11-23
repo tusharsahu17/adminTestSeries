@@ -417,7 +417,7 @@ export default function EnrollmentsPage() {
         open={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         title="Enroll Student"
-        subtitle="Manually grant a student access to a test series."
+        subtitle="Manually grant a student access to tests and platform features."
       >
         <form onSubmit={handleCreate} className="space-y-4">
           <div>
@@ -439,24 +439,29 @@ export default function EnrollmentsPage() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Test Series <span className="text-rose-500">*</span>
-            </label>
-            <select
-              required
-              value={form.testSeriesId}
-              onChange={(e) => setForm({ ...form, testSeriesId: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
-            >
-              <option value="">Select test series...</option>
-              {seriesList.map((s) => (
-                <option key={String(s.id)} value={String(s.id)}>
-                  {s.title}
-                </option>
-              ))}
-            </select>
-          </div>
+          {seriesList.length > 0 ? (
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Target Test Series (Optional)
+              </label>
+              <select
+                value={form.testSeriesId}
+                onChange={(e) => setForm({ ...form, testSeriesId: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">All / Direct Test Access</option>
+                {seriesList.map((s) => (
+                  <option key={String(s.id)} value={String(s.id)}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-lg text-xs text-indigo-800">
+              <strong>Direct Test Access:</strong> Students now browse and attempt tests directly under Subjects and Exams without needing test series enrollment.
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

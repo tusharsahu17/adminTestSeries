@@ -1,5 +1,5 @@
 import { adminService } from '../services/adminService';
-import { extractArray, asRecord, toNum, toStr } from '../services/admin/dashboardNormalizer';
+import { extractArray, asRecord, toStr } from '../services/admin/dashboardNormalizer';
 
 export interface SimpleUserOption {
   id: string | number;
@@ -18,13 +18,8 @@ export async function fetchUsersAndSeries(): Promise<{
   users: SimpleUserOption[];
   series: SimpleSeriesOption[];
 }> {
-  const [usersRes, seriesRes] = await Promise.all([
-    adminService.getUsers().catch(() => []),
-    adminService.getTestSeries().catch(() => []),
-  ]);
-
+  const usersRes = await adminService.getUsers().catch(() => []);
   const rawUsers = extractArray(usersRes, ['users', 'items', 'rows']);
-  const rawSeries = extractArray(seriesRes, ['testSeries', 'series', 'items', 'rows']);
 
   const users: SimpleUserOption[] = rawUsers.map((u) => {
     const r = asRecord(u);
@@ -37,16 +32,6 @@ export async function fetchUsersAndSeries(): Promise<{
     };
   });
 
-  const series: SimpleSeriesOption[] = rawSeries.map((s) => {
-    const r = asRecord(s);
-    return {
-      id: (r.id ?? '') as string | number,
-      title: toStr(r.title ?? r.name, `Series #${r.id}`),
-      price: toNum(r.price),
-      isFree: Boolean(r.is_free ?? r.isFree),
-    };
-  });
-
-  return { users, series };
+  return { users, series: [] };
 }
 

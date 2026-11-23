@@ -47,8 +47,8 @@ export default function GuidePage() {
           <a href="#exams">Exams & Subjects</a>
           <a href="#tests">Tests</a>
           <a href="#questions">Questions</a>
-          <a href="#series">Test Series</a>
-          <a href="#test-series-status">Series API Status</a>
+          <a href="#direct-architecture">Direct Architecture</a>
+          <a href="#architecture-status">Architecture Status</a>
           <a href="#attempts">Attempts & Results</a>
           <a href="#leaderboards">Leaderboards</a>
           <a href="#database">Database Flow</a>
@@ -143,107 +143,66 @@ export default function GuidePage() {
             <div className="guide-note"><b>Bulk Upload:</b> Admin can upload Excel/CSV to create multiple questions and their options at once.</div>
           </section>
 
-          <section className="guide-section" id="series">
-            <h2>5. Test Series</h2>
-            <p>A Test Series is a bundle containing multiple Tests.</p>
-            <pre className="guide-pre">{`CGPSC Complete Mock Test Series
-├── 1. History Mock Test
-├── 2. Geography Mock Test
-├── 3. Polity Mock Test
-├── 4. Economics Mock Test
-└── 5. Full Mock Test`}</pre>
-            <p><b>Database:</b> <code className="guide-code">test_series</code> ↔ <code className="guide-code">test_series_tests</code> ↔ <code className="guide-code">tests</code> (Many-to-Many).</p>
-            <div className="guide-note"><code className="guide-code">test_series_tests.display_order</code> controls the order of tests inside a series.</div>
+          <section className="guide-section" id="direct-architecture">
+            <h2>5. Direct Test Architecture</h2>
+            <p>The Test Series wrapper layer has been completely removed from the backend architecture, allowing students to browse and attempt tests directly under Subjects and Exams.</p>
+            <pre className="guide-pre">{`Direct Hierarchy:
+Exams
+  ↓
+Subjects
+  ↓
+Tests (Published & Active)
+  ↓
+Questions & Options
+  ↓
+Test Attempts (/api/student/tests/:id/start)
+  ↓
+Results & Leaderboards`}</pre>
+            <p><b>Database:</b> <code className="guide-code">exams</code> ↔ <code className="guide-code">exam_subjects</code> ↔ <code className="guide-code">subjects</code> → <code className="guide-code">tests</code> → <code className="guide-code">questions</code></p>
+            <div className="guide-note">Tests belong directly to Subjects, and Subjects can be organized under Exams. Students attempt tests directly without any test series enrollment barrier.</div>
           </section>
 
-          <section className="guide-section" id="test-series-status">
-            <h2>6A. Test Series — Implementation Status</h2>
+          <section className="guide-section" id="architecture-status">
+            <h2>5A. Modernized Backend Architecture & Removed Endpoints</h2>
             <div className="guide-note">
-              <b>Status: Working condition</b><br/>
-              The Test Series functionality is implemented across the database, model, controller, routes and app integration.
+              <b>Status: Test Series Layer Retired</b><br/>
+              The backend architecture has been simplified to direct test access. All obsolete test series endpoints and files have been removed.
             </div>
 
-            <h3>Implementation Checklist</h3>
+            <h3>Key Architectural Changes</h3>
             <div className="guide-grid">
               <div className="guide-card">
-                <h3>🗄️ Database Schema</h3>
-                <p><code className="guide-code">src/config/initTestSeries.js</code> creates:</p>
-                <ul style={{ paddingLeft: '20px' }}>
-                  <li><code className="guide-code">test_series</code> — stores basic series details.</li>
-                  <li><code className="guide-code">test_series_tests</code> — maps tests to a series and stores <code className="guide-code">display_order</code>.</li>
-                </ul>
+                <h3>🚀 Direct Test Discovery</h3>
+                <p>Students browse published and active tests directly from the <code className="guide-code">tests</code> and <code className="guide-code">subjects</code> tables without test series filters or enrollment barriers.</p>
               </div>
               <div className="guide-card">
-                <h3>🧩 Model</h3>
-                <p><code className="guide-code">src/models/testSeriesModel.js</code> contains the required queries and features, including:</p>
-                <ul style={{ paddingLeft: '20px' }}>
-                  <li>Create and update</li>
-                  <li>Duplicate series</li>
-                  <li>Reorder tests</li>
-                  <li>Publish/unpublish</li>
-                  <li>Archive</li>
-                </ul>
+                <h3>⚡ Direct Attempt Creation</h3>
+                <p>Students create attempts directly via <code className="guide-code">/api/student/tests/:testId/start</code> (or <code className="guide-code">/api/tests/:testId/start</code>) with zero prerequisites.</p>
               </div>
               <div className="guide-card">
-                <h3>🎮 Controller</h3>
-                <p><code className="guide-code">src/controllers/adminTestSeriesController.js</code> handles the Test Series operations and connects the API requests to the model functions.</p>
+                <h3>🏆 Direct Leaderboards</h3>
+                <p>Category and subject leaderboards compute rankings directly by joining tests with subjects and exams.</p>
               </div>
               <div className="guide-card">
-                <h3>🛣️ Routes</h3>
-                <p><code className="guide-code">src/routes/adminTestSeriesRoutes.js</code> maps the endpoints and includes Swagger documentation.</p>
+                <h3>🔔 Direct Notifications</h3>
+                <p>New test notifications publish directly to all students without series membership filtering.</p>
               </div>
             </div>
 
-            <h3>App Integration</h3>
-            <div className="guide-card" style={{ marginTop: '20px' }}>
-              <p>The routes are registered in <code className="guide-code">src/app.js</code>:</p>
-              <pre className="guide-pre" style={{ margin: '10px 0' }}>app.use('/api/admin/test-series', adminTestSeriesRoutes);</pre>
-            </div>
-
-            <h3>Available API Endpoints</h3>
+            <h3 style={{ marginTop: '20px' }}>Removed Backend Files & Endpoints</h3>
             <table className="guide-table">
               <thead>
-                <tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr>
+                <tr><th>Removed Item</th><th>Previous Path / Route</th><th>Status</th></tr>
               </thead>
               <tbody>
-                <tr><td>GET</td><td>/api/admin/test-series</td><td>List all test series. Supports <code className="guide-code">is_published</code> and <code className="guide-code">is_archived</code> filters.</td></tr>
-                <tr><td>POST</td><td>/api/admin/test-series</td><td>Create a new test series.</td></tr>
-                <tr><td>GET</td><td>/api/admin/test-series/:id</td><td>Get a specific series, including its tests.</td></tr>
-                <tr><td>PUT</td><td>/api/admin/test-series/:id</td><td>Update an existing test series.</td></tr>
-                <tr><td>DELETE</td><td>/api/admin/test-series/:id</td><td>Permanently delete a test series.</td></tr>
-                <tr><td>PATCH</td><td>/api/admin/test-series/:id/archive</td><td>Archive a test series.</td></tr>
-                <tr><td>PATCH</td><td>/api/admin/test-series/:id/publish</td><td>Toggle publish status.</td></tr>
-                <tr><td>POST</td><td>/api/admin/test-series/:id/duplicate</td><td>Duplicate a series and its linked tests.</td></tr>
-                <tr><td>POST</td><td>/api/admin/test-series/:id/tests</td><td>Add a specific test to the series.</td></tr>
-                <tr><td>PUT</td><td>/api/admin/test-series/:id/tests/reorder</td><td>Change the display order of tests in a series.</td></tr>
+                <tr><td>Test Series Routes</td><td><code className="guide-code">/api/admin/test-series</code> (src/routes/adminTestSeriesRoutes.js)</td><td><span style={{ color: '#ef4444', fontWeight: 'bold' }}>Deleted</span></td></tr>
+                <tr><td>Test Series Controller</td><td><code className="guide-code">src/controllers/adminTestSeriesController.js</code></td><td><span style={{ color: '#ef4444', fontWeight: 'bold' }}>Deleted</span></td></tr>
+                <tr><td>Test Series Model</td><td><code className="guide-code">src/models/testSeriesModel.js</code></td><td><span style={{ color: '#ef4444', fontWeight: 'bold' }}>Deleted</span></td></tr>
+                <tr><td>Init Test Series</td><td><code className="guide-code">src/config/initTestSeries.js</code></td><td><span style={{ color: '#ef4444', fontWeight: 'bold' }}>Deleted</span></td></tr>
+                <tr><td>Dashboard Series</td><td><code className="guide-code">/dashboard/test-series</code> &amp; <code className="guide-code">/test-series/:id</code></td><td><span style={{ color: '#ef4444', fontWeight: 'bold' }}>Deleted</span></td></tr>
+                <tr><td>Leaderboard Series</td><td><code className="guide-code">/series/:seriesId</code> in adminLeaderboardRoutes</td><td><span style={{ color: '#ef4444', fontWeight: 'bold' }}>Deleted</span></td></tr>
               </tbody>
             </table>
-
-            <h3>Test Series API Flow</h3>
-            <pre className="guide-pre">{`Admin
-  ↓
-Create Test Series
-  ↓
-test_series
-  ↓
-Add Tests
-  ↓
-test_series_tests
-  ↓
-Set display_order
-  ↓
-Publish
-  ↓
-Students can access the series
-
-Additional actions:
-  ├── Update
-  ├── Archive
-  ├── Duplicate
-  └── Reorder Tests`}</pre>
-
-            <div className="guide-note"><b>Database Initialization:</b> If the Test Series tables have not been initialized yet, run
-            <code className="guide-code">node src/config/initTestSeries.js</code>.</div>
           </section>
 
           <section className="guide-section" id="attempts">
@@ -327,29 +286,25 @@ LEADERBOARDS`}</pre>
 
           <section className="guide-section" id="workflow">
             <h2>9. Recommended Admin Workflow</h2>
-            <div className="guide-step"><span className="guide-num">1</span><div><b>Create Exam</b><br/>Example: CGPSC.</div></div>
-            <div className="guide-step"><span className="guide-num">2</span><div><b>Add Subjects</b><br/>History, Geography, Polity, etc.</div></div>
-            <div className="guide-step"><span className="guide-num">3</span><div><b>Create Tests</b><br/>Create tests under each subject.</div></div>
-            <div className="guide-step"><span className="guide-num">4</span><div><b>Add Questions</b><br/>Add manually or use Bulk Upload.</div></div>
-            <div className="guide-step"><span className="guide-num">5</span><div><b>Publish Test</b><br/>Make the test available to students.</div></div>
-            <div className="guide-step"><span className="guide-num">6</span><div><b>Create Test Series</b><br/>Optional: group multiple tests into a package.</div></div>
-            <div className="guide-step"><span className="guide-num">7</span><div><b>Monitor Results</b><br/>View attempts, scores and student performance.</div></div>
-            <div className="guide-step"><span className="guide-num">8</span><div><b>Check Leaderboards</b><br/>View rankings generated from attempts.</div></div>
+            <div className="guide-step"><span className="guide-num">1</span><div><b>Create Exam</b><br/>Example: CGPSC, JEE, NEET.</div></div>
+            <div className="guide-step"><span className="guide-num">2</span><div><b>Add Subjects & Topics</b><br/>History, Geography, Physics, Chemistry, etc.</div></div>
+            <div className="guide-step"><span className="guide-num">3</span><div><b>Create Tests</b><br/>Create tests directly under each subject.</div></div>
+            <div className="guide-step"><span className="guide-num">4</span><div><b>Add Questions</b><br/>Add questions from Question Bank or Quick Create.</div></div>
+            <div className="guide-step"><span className="guide-num">5</span><div><b>Publish Test</b><br/>Make test immediately accessible to students.</div></div>
+            <div className="guide-step"><span className="guide-num">6</span><div><b>Monitor Attempts & Results</b><br/>View live attempts, accuracy, and student scores.</div></div>
+            <div className="guide-step"><span className="guide-num">7</span><div><b>Check Leaderboards</b><br/>Overall, exam category, and subject rankings.</div></div>
           </section>
 
           <section className="guide-section">
             <h2>10. One-Minute Understanding</h2>
-            <pre className="guide-pre">{`CONTENT
+            <pre className="guide-pre">{`HIERARCHY
 Exam → Subject → Test → Questions → Options
 
-PACKAGING
-Tests → Test Series
+STUDENT ATTEMPT FLOW
+Student → Discovers Test under Subject/Exam → Starts Attempt → Submits Answers → Result
 
-STUDENT
-User → Attempt → Answers → Result
-
-RANKING
-Results → Test Leaderboard → Series Leaderboard → Overall/Weekly/Monthly`}</pre>
+RANKING & ANALYTICS
+Attempts & Scores → Category Leaderboard → Subject Leaderboard → Overall Ranking`}</pre>
           </section>
 
           <section className="guide-section" id="faq">
@@ -359,8 +314,8 @@ Results → Test Leaderboard → Series Leaderboard → Overall/Weekly/Monthly`}
             <details className="guide-details"><summary className="guide-summary">Can one Subject have multiple Tests?</summary><p>Yes. Each Test has a <code className="guide-code">subject_id</code>.</p></details>
             <details className="guide-details"><summary className="guide-summary">Can one Test have multiple Questions?</summary><p>Yes. Questions contain a <code className="guide-code">test_id</code>.</p></details>
             <details className="guide-details"><summary className="guide-summary">Can one Question have multiple Options?</summary><p>Yes. Options are stored in <code className="guide-code">question_options</code> using <code className="guide-code">question_id</code>.</p></details>
-            <details className="guide-details"><summary className="guide-summary">Can one Test belong to multiple Test Series?</summary><p>Yes. This is handled by <code className="guide-code">test_series_tests</code>.</p></details>
-            <details className="guide-details"><summary className="guide-summary">Do admins create leaderboard records manually?</summary><p>No. Rankings can be calculated from completed attempts and scores.</p></details>
+            <details className="guide-details"><summary className="guide-summary">Do students need test series enrollment to take tests?</summary><p>No. The test series layer has been completely removed. Students can discover and start any published active test directly under Subjects &amp; Exams.</p></details>
+            <details className="guide-details"><summary className="guide-summary">Do admins create leaderboard records manually?</summary><p>No. Rankings are automatically calculated from completed attempts and scores.</p></details>
             <details className="guide-details"><summary className="guide-summary">Where are student answers stored?</summary><p>In <code className="guide-code">attempt_answers</code>, linked to the attempt, question and selected option.</p></details>
           </section>
 

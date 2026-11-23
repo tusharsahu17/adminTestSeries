@@ -45,9 +45,8 @@ export const analyticsService = {
     return normalizeTestAnalytics(res);
   },
 
-  getTestSeries: async (params?: TestSeriesPerformanceParams): Promise<TestSeriesPerformance> => {
-    const res = await getData(ENDPOINTS.ADMIN_DASHBOARD_TEST_SERIES, params);
-    return normalizeTestSeriesPerformance(res);
+  getTestSeries: async (_params?: TestSeriesPerformanceParams): Promise<TestSeriesPerformance> => {
+    return normalizeTestSeriesPerformance({ series: [], highlights: {}, recentlyPublishedSeries: [] });
   },
 
   getRevenue: async (params?: RevenueAnalyticsParams): Promise<RevenueAnalytics> => {

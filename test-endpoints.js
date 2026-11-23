@@ -7,7 +7,7 @@ async function testEndpoints() {
     '/api/admin/users',
     '/api/admin/leaderboards/settings',
     '/api/admin/leaderboards/overall',
-    '/api/admin/test-series',
+    '/api/exams',
     '/api/admin/tests',
     '/api/admin/questions',
     '/api/subjects'

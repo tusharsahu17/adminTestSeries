@@ -143,7 +143,7 @@ export default function ExamsPage() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Exam Management</h1>
-          <p className="text-sm text-gray-500">Manage exams used for organizing test series.</p>
+          <p className="text-sm text-gray-500">Manage exams and organize linked subjects and tests.</p>
         </div>
         <button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
           <Plus className="w-4 h-4" /> Add Exam
