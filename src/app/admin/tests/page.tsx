@@ -392,19 +392,6 @@ export default function TestsPage() {
     }
   };
 
-  const handleDuplicate = async (id: string | number) => {
-    if (confirm('Create a duplicate copy of this test?')) {
-      try {
-        await adminService.duplicateTest(id);
-        alert('Test duplicated successfully');
-        fetchTests();
-      } catch (err) {
-        console.error('Duplicate failed:', err);
-        alert('Failed to duplicate test');
-      }
-    }
-  };
-
   const openEditModal = async (item: any) => {
     setSelectedTestId(item.id);
     const itemExamId = item.exam_id ? String(item.exam_id) : '';
@@ -845,21 +832,14 @@ export default function TestsPage() {
                     </td>
                     <td className="py-3 px-5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button
+                        {/* <button
                           onClick={() => openManageQuestionsModal(test)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-xs"
                           title="Add / Manage Questions"
                         >
                           <HelpCircle className="w-3.5 h-3.5" />
                           <span>Questions</span>
-                        </button>
-                        <button
-                          onClick={() => handleDuplicate(test.id)}
-                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                          title="Duplicate Test"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
+                        </button> */}
                         <button
                           onClick={() => openViewModal(test)}
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"

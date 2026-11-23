@@ -151,13 +151,13 @@ export default function DashboardStats({ overview, compact = false }: DashboardS
             icon={<Activity className="w-5 h-5" />}
             accentClass="bg-rose-50 text-rose-600"
           />
-          <StatCard
+          {/* <StatCard
             title="Scheduled Tests"
             value={formatCompactNumber(overview.scheduledTests)}
             subtitle="Upcoming scheduled tests"
             icon={<Calendar className="w-5 h-5" />}
             accentClass="bg-amber-50 text-amber-600"
-          />
+          /> */}
         </div>
       )}
     </div>
