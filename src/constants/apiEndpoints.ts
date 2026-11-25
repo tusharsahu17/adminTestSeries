@@ -66,4 +66,40 @@ export const ENDPOINTS = {
   ADMIN_PDF_CATEGORIES: '/api/admin/pdf-categories',
   PDF_CATEGORY_DETAIL: (id: string | number) => `/api/pdf-categories/${id}`,
   PDF_CATEGORY_PDFS: (id: string | number) => `/api/pdf-categories/${id}/pdfs`,
+
+  // Exams & Hierarchy
+  ADMIN_EXAMS: '/api/admin/exams',
+  EXAM_DETAIL: (id: string | number) => `/api/exams/${id}`,
+  EXAM_SUBJECTS: (examId: string | number) => `/api/exams/${examId}/subjects`,
+  EXAM_SUBJECT_DETAIL: (examId: string | number, subjectId: string | number) =>
+    `/api/exams/${examId}/subjects/${subjectId}`,
+  EXAM_HIERARCHY: (examId: string | number) => `/api/exams/${examId}/hierarchy`,
+  EXAM_TESTS: (examId: string | number) => `/api/exams/${examId}/tests`,
+
+  // Subjects, Topics & Subtopics Hierarchy
+  ADMIN_SUBJECTS: '/api/admin/subjects',
+  SUBJECT_DETAIL: (id: string | number) => `/api/subjects/${id}`,
+  SUBJECT_TESTS: (subjectId: string | number) => `/api/subjects/${subjectId}/tests`,
+  ADMIN_HIERARCHY_SUBJECT_TOPICS: (subjectId: string | number) =>
+    `/api/admin/hierarchy/subjects/${subjectId}/topics`,
+  ADMIN_HIERARCHY_TOPIC_DETAIL: (topicId: string | number) =>
+    `/api/admin/hierarchy/topics/${topicId}`,
+  ADMIN_HIERARCHY_TOPIC_SUBTOPICS: (topicId: string | number) =>
+    `/api/admin/hierarchy/topics/${topicId}/subtopics`,
+  ADMIN_HIERARCHY_SUBTOPIC_DETAIL: (subtopicId: string | number) =>
+    `/api/admin/hierarchy/subtopics/${subtopicId}`,
+
+  // Tests & Topic-Wise Tests
+  ADMIN_TESTS: '/api/admin/tests',
+  ADMIN_TEST_DETAIL: (id: string | number) => `/api/admin/tests/${id}`,
+  ADMIN_TEST_QUESTIONS: (testId: string | number) => `/api/admin/tests/${testId}/questions`,
+  ADMIN_TEST_AUTO_POPULATE: (testId: string | number) =>
+    `/api/admin/tests/${testId}/questions/auto-populate`,
+  ADMIN_TEST_PUBLISH: (testId: string | number) => `/api/admin/tests/${testId}/publish`,
+  ADMIN_TEST_DUPLICATE: (testId: string | number) => `/api/admin/tests/${testId}/duplicate`,
+
+  // Questions Bank
+  ADMIN_QUESTIONS: '/api/admin/questions',
+  ADMIN_QUESTION_DETAIL: (id: string | number) => `/api/admin/questions/${id}`,
+  ADMIN_QUESTIONS_BULK_UPLOAD: '/api/admin/questions/bulk/upload',
 };

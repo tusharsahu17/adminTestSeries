@@ -5,7 +5,7 @@ const backendUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:5001')
 const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "localhost",
-    "192.168.1.106"
+    "192.168.1.107"
   ],
   async rewrites() {
     return [

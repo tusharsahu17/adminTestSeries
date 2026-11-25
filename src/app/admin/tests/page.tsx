@@ -6,7 +6,6 @@ import {
   Search,
   Plus,
   Edit,
-  Copy,
   Trash2,
   Clock,
   CheckCircle,
@@ -20,20 +19,36 @@ import {
   AlertCircle,
   Layers,
   Sparkles,
+  Tag,
+  BookOpen,
+  Filter,
+  CheckCircle2,
+  Zap,
+  Globe,
+  Lock,
 } from 'lucide-react';
-import Link from 'next/link';
 
 export default function TestsPage() {
   const [tests, setTests] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [exams, setExams] = useState<any[]>([]);
-  const [selectedExamFilter, setSelectedExamFilter] = useState<string>('ALL');
-  const [examSubjectsMap, setExamSubjectsMap] = useState<Record<string, any[]>>({});
-  const [loadingExamSubjects, setLoadingExamSubjects] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Search state
+  // Hierarchy caching: topics by subjectId, subtopics by topicId
+  const [subjectTopicsMap, setSubjectTopicsMap] = useState<Record<string, any[]>>({});
+  const [topicSubtopicsMap, setTopicSubtopicsMap] = useState<Record<string, any[]>>({});
+  const [examSubjectsMap, setExamSubjectsMap] = useState<Record<string, any[]>>({});
+  const [loadingExamSubjects, setLoadingExamSubjects] = useState(false);
+  const [loadingTopics, setLoadingTopics] = useState(false);
+  const [loadingSubtopics, setLoadingSubtopics] = useState(false);
+
+  // Filter state
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedExamFilter, setSelectedExamFilter] = useState<string>('ALL');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('ALL');
+  const [selectedTopicFilter, setSelectedTopicFilter] = useState<string>('ALL');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('ALL');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL');
 
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -42,6 +57,7 @@ export default function TestsPage() {
   const [viewData, setViewData] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
+  const [togglingPublishId, setTogglingPublishId] = useState<string | null>(null);
 
   // Staged questions for Create / Edit modal
   const [stagedQuestions, setStagedQuestions] = useState<any[]>([]);
@@ -63,7 +79,6 @@ export default function TestsPage() {
     negative_marks: number | '';
     difficulty: string;
     explanation: string;
-    topic: string;
     options: {
       option_text: string;
       option_key: string;
@@ -77,7 +92,6 @@ export default function TestsPage() {
     negative_marks: 0,
     difficulty: 'Medium',
     explanation: '',
-    topic: '',
     options: [
       { option_text: '', option_key: 'A', is_correct: true, display_order: 1 },
       { option_text: '', option_key: 'B', is_correct: false, display_order: 2 },
@@ -91,7 +105,13 @@ export default function TestsPage() {
   const [activeTestForQuestions, setActiveTestForQuestions] = useState<any>(null);
   const [testQuestions, setTestQuestions] = useState<any[]>([]);
   const [loadingTestQuestions, setLoadingTestQuestions] = useState(false);
-  const [questionTab, setQuestionTab] = useState<'linked' | 'bank' | 'create'>('linked');
+  const [questionTab, setQuestionTab] = useState<'linked' | 'auto_populate' | 'bank' | 'create'>('linked');
+
+  // Auto-populate tab state in Manage Questions modal
+  const [autoPopulateCount, setAutoPopulateCount] = useState<number>(10);
+  const [autoPopulateTopicId, setAutoPopulateTopicId] = useState<string>('');
+  const [autoPopulateDifficulty, setAutoPopulateDifficulty] = useState<string>('Medium');
+  const [autoPopulating, setAutoPopulating] = useState(false);
 
   // Dedicated modal bank questions state
   const [bankQuestions, setBankQuestions] = useState<any[]>([]);
@@ -100,7 +120,7 @@ export default function TestsPage() {
   const [selectedBankQuestionIds, setSelectedBankQuestionIds] = useState<Set<number>>(new Set());
   const [addingFromBank, setAddingFromBank] = useState(false);
 
-  // Dedicated modal new question form
+  // Dedicated modal new question form (Step 6 Option 3)
   const [newQuestionForm, setNewQuestionForm] = useState<{
     question_text: string;
     question_type: string;
@@ -108,7 +128,8 @@ export default function TestsPage() {
     negative_marks: number | '';
     difficulty: string;
     explanation: string;
-    topic: string;
+    topic_id: string;
+    subtopic_id: string;
     options: {
       option_text: string;
       option_key: string;
@@ -122,7 +143,8 @@ export default function TestsPage() {
     negative_marks: 0,
     difficulty: 'Medium',
     explanation: '',
-    topic: '',
+    topic_id: '',
+    subtopic_id: '',
     options: [
       { option_text: '', option_key: 'A', is_correct: true, display_order: 1 },
       { option_text: '', option_key: 'B', is_correct: false, display_order: 2 },
@@ -133,22 +155,39 @@ export default function TestsPage() {
   const [creatingQuestion, setCreatingQuestion] = useState(false);
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
 
+  // Main Test Form (Matching Steps 1, 5, 7 Payloads)
   const [form, setForm] = useState<{
-    title: string;
+    name: string;
+    description: string;
     exam_id: string;
-    duration: number | '';
+    subject_id: string;
+    test_type: 'topic_wise' | 'full_length' | 'multi_topic';
+    topic_id: string;
+    subtopic_id: string;
+    topic_ids: number[];
+    duration_minutes: number | '';
     total_marks: number | '';
     passing_marks: number | '';
-    subject_id: string;
+    negative_marking: number | '';
+    difficulty: string;
+    is_free: boolean;
     is_published: boolean;
     questions_count: number;
   }>({
-    title: '',
+    name: '',
+    description: '',
     exam_id: '',
-    duration: 60,
-    total_marks: 100,
-    passing_marks: 33,
     subject_id: '',
+    test_type: 'topic_wise',
+    topic_id: '',
+    subtopic_id: '',
+    topic_ids: [],
+    duration_minutes: 20,
+    total_marks: 20,
+    passing_marks: 8,
+    negative_marking: 0.5,
+    difficulty: 'Medium',
+    is_free: true,
     is_published: false,
     questions_count: 0,
   });
@@ -165,11 +204,40 @@ export default function TestsPage() {
     return exam ? exam.name : `Exam #${examId}`;
   };
 
+  const getTopicName = (subjectId: string | number, topicId: string | number) => {
+    if (!topicId) return null;
+    const list = subjectTopicsMap[String(subjectId)] || [];
+    const t = list.find((item) => String(item.id) === String(topicId));
+    return t ? t.name : `Topic #${topicId}`;
+  };
+
+  const getSubtopicName = (topicId: string | number, subtopicId: string | number) => {
+    if (!subtopicId) return null;
+    const list = topicSubtopicsMap[String(topicId)] || [];
+    const st = list.find((item) => String(item.id) === String(subtopicId));
+    return st ? st.name : `Subtopic #${subtopicId}`;
+  };
+
   const fetchTests = async () => {
     setLoading(true);
     try {
-      const res = await adminService.getTests({ search: searchTerm });
-      const data = res.data?.tests || res.data || res;
+      const params: any = {};
+      if (searchTerm) params.search = searchTerm;
+      if (selectedExamFilter !== 'ALL' && selectedExamFilter !== 'UNASSIGNED') {
+        params.exam_id = selectedExamFilter;
+      }
+      if (selectedSubjectFilter !== 'ALL') {
+        params.subject_id = selectedSubjectFilter;
+      }
+      if (selectedTopicFilter !== 'ALL') {
+        params.topic_id = selectedTopicFilter;
+      }
+      if (selectedTypeFilter !== 'ALL') {
+        params.test_type = selectedTypeFilter;
+      }
+
+      const res = await adminService.getTests(params);
+      const data = res.tests || res.data?.tests || res.data || res;
       setTests(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch tests:', err);
@@ -191,15 +259,51 @@ export default function TestsPage() {
   const fetchExams = async () => {
     try {
       const res = await adminService.getExams();
-      const data = res.data?.exams || res.data || res;
+      const data = res.exams || res.data?.exams || res.data || res;
       setExams(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch exams:', err);
     }
   };
 
+  const loadTopicsForSubject = async (subjectId: string | number) => {
+    const sId = String(subjectId);
+    if (!sId || subjectTopicsMap[sId]) return;
+    setLoadingTopics(true);
+    try {
+      const res = await adminService.getTopics(sId);
+      const data = res.topics || res.data?.topics || res.data || res;
+      setSubjectTopicsMap((prev) => ({
+        ...prev,
+        [sId]: Array.isArray(data) ? data : [],
+      }));
+    } catch (err) {
+      console.error('Failed to load topics for subject:', err);
+    } finally {
+      setLoadingTopics(false);
+    }
+  };
+
+  const loadSubtopicsForTopic = async (topicId: string | number) => {
+    const tId = String(topicId);
+    if (!tId || topicSubtopicsMap[tId]) return;
+    setLoadingSubtopics(true);
+    try {
+      const res = await adminService.getSubtopics(tId);
+      const data = res.subtopics || res.data?.subtopics || res.data || res;
+      setTopicSubtopicsMap((prev) => ({
+        ...prev,
+        [tId]: Array.isArray(data) ? data : [],
+      }));
+    } catch (err) {
+      console.error('Failed to load subtopics for topic:', err);
+    } finally {
+      setLoadingSubtopics(false);
+    }
+  };
+
   const handleExamChange = async (examId: string) => {
-    setForm((prev) => ({ ...prev, exam_id: examId, subject_id: '' }));
+    setForm((prev) => ({ ...prev, exam_id: examId, subject_id: '', topic_id: '', subtopic_id: '' }));
     if (!examId) return;
     if (examSubjectsMap[examId]) return;
 
@@ -218,24 +322,74 @@ export default function TestsPage() {
     }
   };
 
+  const handleSubjectChange = async (subjectId: string) => {
+    setForm((prev) => ({
+      ...prev,
+      subject_id: subjectId,
+      topic_id: '',
+      subtopic_id: '',
+      topic_ids: [],
+    }));
+    if (subjectId) {
+      await loadTopicsForSubject(subjectId);
+    }
+  };
+
+  const handleTopicChange = async (topicId: string) => {
+    setForm((prev) => ({ ...prev, topic_id: topicId, subtopic_id: '' }));
+    if (topicId) {
+      await loadSubtopicsForTopic(topicId);
+    }
+  };
+
   const availableSubjectsForModal =
     form.exam_id && examSubjectsMap[form.exam_id]?.length
       ? examSubjectsMap[form.exam_id]
       : subjects;
 
+  const currentAvailableTopics = form.subject_id ? subjectTopicsMap[form.subject_id] || [] : [];
+  const currentAvailableSubtopics = form.topic_id ? topicSubtopicsMap[form.topic_id] || [] : [];
+
+  // Table filtering
   const filteredTests = tests.filter((test) => {
-    if (selectedExamFilter === 'ALL') return true;
-    if (selectedExamFilter === 'UNASSIGNED') {
-      return !test.exam_id;
+    // Exam filter
+    if (selectedExamFilter !== 'ALL') {
+      if (selectedExamFilter === 'UNASSIGNED') {
+        if (test.exam_id) return false;
+      } else if (String(test.exam_id || '') !== String(selectedExamFilter)) {
+        return false;
+      }
     }
-    return String(test.exam_id || '') === String(selectedExamFilter);
+    // Subject filter
+    if (selectedSubjectFilter !== 'ALL' && String(test.subject_id || '') !== String(selectedSubjectFilter)) {
+      return false;
+    }
+    // Topic filter
+    if (selectedTopicFilter !== 'ALL') {
+      const matchesSingle = String(test.topic_id || '') === String(selectedTopicFilter);
+      const matchesMulti =
+        Array.isArray(test.topic_ids) && test.topic_ids.map(String).includes(String(selectedTopicFilter));
+      if (!matchesSingle && !matchesMulti) return false;
+    }
+    // Test Type filter
+    if (selectedTypeFilter !== 'ALL') {
+      const type = (test.test_type || (test.topic_id ? 'topic_wise' : 'full_length')).toLowerCase();
+      if (type !== selectedTypeFilter.toLowerCase()) return false;
+    }
+    // Status filter
+    if (selectedStatusFilter !== 'ALL') {
+      const isPub = !!test.is_published || String(test.status || '').toLowerCase() === 'published';
+      if (selectedStatusFilter === 'published' && !isPub) return false;
+      if (selectedStatusFilter === 'draft' && isPub) return false;
+    }
+    return true;
   });
 
   useEffect(() => {
     fetchTests();
     fetchSubjects();
     fetchExams();
-  }, [searchTerm]);
+  }, [searchTerm, selectedExamFilter, selectedSubjectFilter, selectedTopicFilter, selectedTypeFilter]);
 
   // Keep questions_count in sync with stagedQuestions during create/edit
   useEffect(() => {
@@ -253,10 +407,12 @@ export default function TestsPage() {
       const loadPickerQuestions = async () => {
         setLoadingBankForPicker(true);
         try {
-          const res = await adminService.getQuestions({ search: bankSearchTerm });
+          const params: any = { search: bankSearchTerm };
+          if (form.subject_id) params.subject_id = form.subject_id;
+          if (form.topic_id) params.topic_id = form.topic_id;
+          const res = await adminService.getQuestions(params);
           const data = res?.questions || res?.data?.questions || res?.data || res;
           const all: any[] = Array.isArray(data) ? data : [];
-          // Filter out questions already in stagedQuestions
           const stagedIds = new Set(stagedQuestions.filter((q) => q.id).map((q) => Number(q.id)));
           setAvailableBankQuestions(all.filter((q) => !stagedIds.has(Number(q.id))));
         } catch (err) {
@@ -267,42 +423,91 @@ export default function TestsPage() {
       };
       loadPickerQuestions();
     }
-  }, [isPickFromBankOpen, bankSearchTerm, stagedQuestions]);
+  }, [isPickFromBankOpen, bankSearchTerm, stagedQuestions, form.subject_id, form.topic_id]);
 
+  // Fast One-Click Toggle Publish (Step 7)
+  const handleTogglePublish = async (test: any) => {
+    const newPublishStatus = !test.is_published;
+    setTogglingPublishId(String(test.id));
+    try {
+      await adminService.publishTest(test.id, newPublishStatus);
+      setTests((prev) =>
+        prev.map((t) =>
+          String(t.id) === String(test.id) ? { ...t, is_published: newPublishStatus } : t
+        )
+      );
+    } catch (err: any) {
+      console.error('Publish toggle failed:', err);
+      alert(err.response?.data?.error || 'Failed to update test publish status');
+    } finally {
+      setTogglingPublishId(null);
+    }
+  };
+
+  // Step 5: Create Topic-Wise / Full-Length Test
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !form.subject_id) return alert('Title and Subject are required');
+    if (!form.name || !form.subject_id) return alert('Test Name and Subject are required');
+    if (form.test_type === 'topic_wise' && !form.topic_id) {
+      return alert('Please select a Topic for topic-wise test');
+    }
+
     setSubmitting(true);
     try {
       const payload: any = {
-        ...form,
-        name: form.title,
+        name: form.name,
+        title: form.name,
+        description: form.description,
         exam_id: form.exam_id ? parseInt(form.exam_id, 10) : null,
         subject_id: parseInt(form.subject_id, 10),
+        test_type: form.test_type,
+        duration_minutes: form.duration_minutes === '' ? 20 : Number(form.duration_minutes),
+        duration: form.duration_minutes === '' ? 20 : Number(form.duration_minutes),
+        total_marks: form.total_marks === '' ? 20 : Number(form.total_marks),
+        passing_marks: form.passing_marks === '' ? 8 : Number(form.passing_marks),
+        negative_marking: form.negative_marking === '' ? 0.5 : Number(form.negative_marking),
+        difficulty: form.difficulty || 'Medium',
+        is_free: !!form.is_free,
+        is_published: !!form.is_published,
         total_questions: stagedQuestions.length > 0 ? stagedQuestions.length : form.questions_count,
-        duration_minutes: form.duration === '' ? 60 : Number(form.duration),
-        duration: form.duration === '' ? 60 : Number(form.duration),
-        total_marks: form.total_marks === '' ? 100 : Number(form.total_marks),
-        passing_marks: form.passing_marks === '' ? 33 : Number(form.passing_marks),
       };
+
+      if (form.test_type === 'topic_wise') {
+        payload.topic_id = parseInt(form.topic_id, 10);
+        if (form.subtopic_id) {
+          payload.subtopic_id = parseInt(form.subtopic_id, 10);
+        }
+      } else if (form.test_type === 'multi_topic') {
+        payload.topic_ids = form.topic_ids.map(Number);
+      }
+
       const res: any = await adminService.createTest(payload);
-      const newTestId = res?.testId || res?.data?.testId || res?.id;
+      const newTestId = res?.testId || res?.data?.testId || res?.id || res?.data?.id;
 
       // Attach staged questions if any
       if (newTestId && stagedQuestions.length > 0) {
-        const subjectName = getSubjectName(form.subject_id);
-        for (const q of stagedQuestions) {
-          if (q.is_new_draft) {
-            // Create new question with this test_id
-            await adminService.createQuestion({
-              ...q,
-              test_id: newTestId,
-              subject: subjectName,
-            });
-          } else if (q.id) {
-            // Link existing question from bank to this test
-            await adminService.updateQuestion(String(q.id), { test_id: newTestId });
+        const existingIds = stagedQuestions.filter((q) => !q.is_new_draft && q.id).map((q) => Number(q.id));
+        if (existingIds.length > 0) {
+          try {
+            await adminService.assignQuestionsToTest(newTestId, existingIds);
+          } catch (assignErr) {
+            // Fallback: update individually
+            for (const id of existingIds) {
+              await adminService.updateQuestion(String(id), { test_id: newTestId });
+            }
           }
+        }
+
+        // Draft questions created on the fly
+        const draftQuestions = stagedQuestions.filter((q) => q.is_new_draft);
+        for (const q of draftQuestions) {
+          await adminService.createQuestion({
+            ...q,
+            test_id: newTestId,
+            subject_id: form.subject_id ? parseInt(form.subject_id, 10) : undefined,
+            topic_id: form.topic_id ? parseInt(form.topic_id, 10) : undefined,
+            subtopic_id: form.subtopic_id ? parseInt(form.subtopic_id, 10) : undefined,
+          });
         }
       }
 
@@ -314,31 +519,47 @@ export default function TestsPage() {
       setIsCreateOpen(false);
       resetForm();
       fetchTests();
-    } catch (err) {
-      console.error('Create failed:', err);
-      alert('Failed to create Test');
+    } catch (err: any) {
+      console.error('Create test failed:', err);
+      alert(err.response?.data?.error || 'Failed to create Test');
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Edit Test
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !selectedTestId || !form.subject_id)
-      return alert('Title and Subject are required');
+    if (!form.name || !selectedTestId || !form.subject_id) {
+      return alert('Name and Subject are required');
+    }
     setSubmitting(true);
     try {
       const payload: any = {
-        ...form,
-        name: form.title,
+        name: form.name,
+        title: form.name,
+        description: form.description,
         exam_id: form.exam_id ? parseInt(form.exam_id, 10) : null,
         subject_id: parseInt(form.subject_id, 10),
+        test_type: form.test_type,
+        duration_minutes: form.duration_minutes === '' ? 20 : Number(form.duration_minutes),
+        duration: form.duration_minutes === '' ? 20 : Number(form.duration_minutes),
+        total_marks: form.total_marks === '' ? 20 : Number(form.total_marks),
+        passing_marks: form.passing_marks === '' ? 8 : Number(form.passing_marks),
+        negative_marking: form.negative_marking === '' ? 0.5 : Number(form.negative_marking),
+        difficulty: form.difficulty || 'Medium',
+        is_free: !!form.is_free,
+        is_published: !!form.is_published,
         total_questions: stagedQuestions.length,
-        duration_minutes: form.duration === '' ? 60 : Number(form.duration),
-        duration: form.duration === '' ? 60 : Number(form.duration),
-        total_marks: form.total_marks === '' ? 100 : Number(form.total_marks),
-        passing_marks: form.passing_marks === '' ? 33 : Number(form.passing_marks),
       };
+
+      if (form.test_type === 'topic_wise') {
+        payload.topic_id = form.topic_id ? parseInt(form.topic_id, 10) : null;
+        payload.subtopic_id = form.subtopic_id ? parseInt(form.subtopic_id, 10) : null;
+      } else if (form.test_type === 'multi_topic') {
+        payload.topic_ids = form.topic_ids.map(Number);
+      }
+
       await adminService.updateTest(selectedTestId, payload);
 
       // Handle questions diffing
@@ -346,24 +567,35 @@ export default function TestsPage() {
         stagedQuestions.filter((q) => !q.is_new_draft && q.id).map((q) => Number(q.id))
       );
 
-      // 1. Unlink removed questions
+      // Unlink removed questions
       for (const origId of originalStagedQuestionIds) {
         if (!currentIds.has(origId)) {
           await adminService.updateQuestion(String(origId), { test_id: null });
         }
       }
 
-      // 2. Link newly added bank questions and create newly drafted questions
-      const subjectName = getSubjectName(form.subject_id);
+      // Link newly added bank questions
+      const newlyAddedIds = Array.from(currentIds).filter((id) => !originalStagedQuestionIds.has(id));
+      if (newlyAddedIds.length > 0) {
+        try {
+          await adminService.assignQuestionsToTest(selectedTestId, newlyAddedIds);
+        } catch (e) {
+          for (const id of newlyAddedIds) {
+            await adminService.updateQuestion(String(id), { test_id: selectedTestId });
+          }
+        }
+      }
+
+      // Create new draft questions
       for (const q of stagedQuestions) {
         if (q.is_new_draft) {
           await adminService.createQuestion({
             ...q,
             test_id: selectedTestId,
-            subject: subjectName,
+            subject_id: form.subject_id ? parseInt(form.subject_id, 10) : undefined,
+            topic_id: form.topic_id ? parseInt(form.topic_id, 10) : undefined,
+            subtopic_id: form.subtopic_id ? parseInt(form.subtopic_id, 10) : undefined,
           });
-        } else if (q.id && !originalStagedQuestionIds.has(Number(q.id))) {
-          await adminService.updateQuestion(String(q.id), { test_id: selectedTestId });
         }
       }
 
@@ -371,15 +603,15 @@ export default function TestsPage() {
       setIsEditOpen(false);
       resetForm();
       fetchTests();
-    } catch (err) {
-      console.error('Update failed:', err);
-      alert('Failed to update Test');
+    } catch (err: any) {
+      console.error('Update test failed:', err);
+      alert(err.response?.data?.error || 'Failed to update Test');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string | number) => {
     if (confirm('Are you sure you want to delete this test?')) {
       try {
         await adminService.deleteTest(id);
@@ -393,21 +625,39 @@ export default function TestsPage() {
   };
 
   const openEditModal = async (item: any) => {
-    setSelectedTestId(item.id);
+    setSelectedTestId(String(item.id));
     const itemExamId = item.exam_id ? String(item.exam_id) : '';
+    const itemSubjectId = item.subject_id ? String(item.subject_id) : '';
+    const itemTopicId = item.topic_id ? String(item.topic_id) : '';
+    const itemSubtopicId = item.subtopic_id ? String(item.subtopic_id) : '';
+
     setForm({
-      title: item.title || item.name || '',
+      name: item.name || item.title || '',
+      description: item.description || '',
       exam_id: itemExamId,
-      duration: item.duration_minutes ?? item.duration ?? 60,
-      total_marks: item.total_marks ?? 100,
-      passing_marks: item.passing_marks ?? 33,
-      subject_id: item.subject_id ? String(item.subject_id) : '',
+      subject_id: itemSubjectId,
+      test_type: item.test_type || (itemTopicId ? 'topic_wise' : 'full_length'),
+      topic_id: itemTopicId,
+      subtopic_id: itemSubtopicId,
+      topic_ids: Array.isArray(item.topic_ids) ? item.topic_ids.map(Number) : [],
+      duration_minutes: item.duration_minutes ?? item.duration ?? 20,
+      total_marks: item.total_marks ?? 20,
+      passing_marks: item.passing_marks ?? 8,
+      negative_marking: item.negative_marking ?? item.negative_marks ?? 0.5,
+      difficulty: item.difficulty || 'Medium',
+      is_free: item.is_free !== undefined ? !!item.is_free : true,
       is_published: !!item.is_published,
       questions_count: item.total_questions || item.questions_count || 0,
     });
 
     if (itemExamId && !examSubjectsMap[itemExamId]) {
       handleExamChange(itemExamId);
+    }
+    if (itemSubjectId) {
+      loadTopicsForSubject(itemSubjectId);
+    }
+    if (itemTopicId) {
+      loadSubtopicsForTopic(itemTopicId);
     }
 
     // Load existing questions for this test into stagedQuestions
@@ -437,12 +687,20 @@ export default function TestsPage() {
 
   const resetForm = () => {
     setForm({
-      title: '',
+      name: '',
+      description: '',
       exam_id: '',
-      duration: 60,
-      total_marks: 100,
-      passing_marks: 33,
       subject_id: '',
+      test_type: 'topic_wise',
+      topic_id: '',
+      subtopic_id: '',
+      topic_ids: [],
+      duration_minutes: 20,
+      total_marks: 20,
+      passing_marks: 8,
+      negative_marking: 0.5,
+      difficulty: 'Medium',
+      is_free: true,
       is_published: false,
       questions_count: 0,
     });
@@ -452,7 +710,6 @@ export default function TestsPage() {
   };
 
   // --- STAGED QUESTIONS HANDLERS (DURING CREATE / EDIT) ---
-
   const handleAddSelectedFromPicker = () => {
     const toAdd = availableBankQuestions.filter((q) => selectedBankIdsToAdd.has(Number(q.id)));
     setStagedQuestions((prev) => [...prev, ...toAdd]);
@@ -475,7 +732,6 @@ export default function TestsPage() {
     };
     setStagedQuestions((prev) => [...prev, newQuestion]);
     setIsQuickCreateQuestionOpen(false);
-    // Reset quick draft form
     setQuickQuestionForm({
       question_text: '',
       question_type: 'MCQ',
@@ -483,7 +739,6 @@ export default function TestsPage() {
       negative_marks: 0,
       difficulty: 'Medium',
       explanation: '',
-      topic: '',
       options: [
         { option_text: '', option_key: 'A', is_correct: true, display_order: 1 },
         { option_text: '', option_key: 'B', is_correct: false, display_order: 2 },
@@ -494,7 +749,6 @@ export default function TestsPage() {
   };
 
   // --- DEDICATED MANAGE QUESTIONS MODAL LOGIC (TABLE ACTION) ---
-
   const fetchTestQuestions = async (testId: string | number) => {
     setLoadingTestQuestions(true);
     try {
@@ -513,7 +767,6 @@ export default function TestsPage() {
       }
 
       setTestQuestions(loaded);
-      // Sync local tests state with question count
       setTests((prev) =>
         prev.map((t) =>
           String(t.id) === String(testId)
@@ -531,7 +784,14 @@ export default function TestsPage() {
   const fetchBankQuestions = async () => {
     setLoadingBankQuestions(true);
     try {
-      const res = await adminService.getQuestions({ search: bankSearch });
+      const params: any = { search: bankSearch };
+      if (activeTestForQuestions?.subject_id) {
+        params.subject_id = activeTestForQuestions.subject_id;
+      }
+      if (activeTestForQuestions?.topic_id) {
+        params.topic_id = activeTestForQuestions.topic_id;
+      }
+      const res = await adminService.getQuestions(params);
       const data = res?.questions || res?.data?.questions || res?.data || res;
       const all: any[] = Array.isArray(data) ? data : [];
       const currentIds = new Set(testQuestions.map((q) => Number(q.id)));
@@ -549,6 +809,33 @@ export default function TestsPage() {
     setQuestionTab('linked');
     setSelectedBankQuestionIds(new Set());
     setBankSearch('');
+    setAutoPopulateTopicId(test.topic_id ? String(test.topic_id) : '');
+    setAutoPopulateDifficulty(test.difficulty || 'Medium');
+    setAutoPopulateCount(10);
+    setNewQuestionForm({
+      question_text: '',
+      question_type: 'MCQ',
+      marks: 2,
+      negative_marks: test.negative_marking || 0.5,
+      difficulty: test.difficulty || 'Medium',
+      explanation: '',
+      topic_id: test.topic_id ? String(test.topic_id) : '',
+      subtopic_id: test.subtopic_id ? String(test.subtopic_id) : '',
+      options: [
+        { option_text: '', option_key: 'A', is_correct: true, display_order: 1 },
+        { option_text: '', option_key: 'B', is_correct: false, display_order: 2 },
+        { option_text: '', option_key: 'C', is_correct: false, display_order: 3 },
+        { option_text: '', option_key: 'D', is_correct: false, display_order: 4 },
+      ],
+    });
+
+    if (test.subject_id) {
+      loadTopicsForSubject(test.subject_id);
+    }
+    if (test.topic_id) {
+      loadSubtopicsForTopic(test.topic_id);
+    }
+
     setIsManageQuestionsOpen(true);
     fetchTestQuestions(test.id);
   };
@@ -577,21 +864,27 @@ export default function TestsPage() {
     }
   };
 
+  // Step 6 Option 1: Assign existing questions from Question Bank
   const handleAddSelectedFromBank = async () => {
     if (selectedBankQuestionIds.size === 0 || !activeTestForQuestions) return;
     setAddingFromBank(true);
     try {
       const ids = Array.from(selectedBankQuestionIds);
-      await Promise.all(
-        ids.map((id) =>
-          adminService.updateQuestion(String(id), { test_id: activeTestForQuestions.id })
-        )
-      );
+      try {
+        await adminService.assignQuestionsToTest(activeTestForQuestions.id, ids);
+      } catch (e) {
+        // Fallback
+        await Promise.all(
+          ids.map((id) =>
+            adminService.updateQuestion(String(id), { test_id: activeTestForQuestions.id })
+          )
+        );
+      }
 
       await fetchTestQuestions(activeTestForQuestions.id);
       setSelectedBankQuestionIds(new Set());
       setQuestionTab('linked');
-      alert(`Successfully added ${ids.length} question(s) to this test!`);
+      alert(`Successfully assigned ${ids.length} question(s) to this test!`);
     } catch (err) {
       console.error('Failed to add questions from bank:', err);
       alert('Failed to add some questions to the test');
@@ -600,25 +893,37 @@ export default function TestsPage() {
     }
   };
 
-  const handleUnlinkQuestion = async (questionId: string | number) => {
-    if (
-      !confirm(
-        'Unlink this question from this test? The question will remain safely in the general Question Bank.'
-      )
-    ) {
-      return;
+  // Step 6 Option 2: Auto-Populate from Question Bank by Topic
+  const handleAutoPopulate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeTestForQuestions) return;
+    const targetTopicId = autoPopulateTopicId || activeTestForQuestions.topic_id;
+    if (!targetTopicId) {
+      return alert('Please select a topic to auto-populate from');
     }
+
+    setAutoPopulating(true);
     try {
-      await adminService.updateQuestion(String(questionId), { test_id: null });
-      if (activeTestForQuestions) {
-        await fetchTestQuestions(activeTestForQuestions.id);
-      }
-    } catch (err) {
-      console.error('Failed to unlink question:', err);
-      alert('Failed to unlink question');
+      await adminService.autoPopulateTestQuestions(activeTestForQuestions.id, {
+        count: autoPopulateCount,
+        topic_id: targetTopicId,
+        difficulty: autoPopulateDifficulty,
+      });
+
+      await fetchTestQuestions(activeTestForQuestions.id);
+      setQuestionTab('linked');
+      alert(
+        `Successfully auto-populated ${autoPopulateCount} questions for this test from the Question Bank!`
+      );
+    } catch (err: any) {
+      console.error('Auto-populate failed:', err);
+      alert(err.response?.data?.error || 'Failed to auto-populate questions from Question Bank');
+    } finally {
+      setAutoPopulating(false);
     }
   };
 
+  // Step 6 Option 3: Create New Question with Topic Tagging
   const handleCreateNewQuestionForTest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newQuestionForm.question_text.trim()) {
@@ -629,23 +934,43 @@ export default function TestsPage() {
     setCreatingQuestion(true);
     try {
       const subjectName = getSubjectName(activeTestForQuestions.subject_id);
-      const payload = {
-        ...newQuestionForm,
-        marks: newQuestionForm.marks === '' ? 1 : Number(newQuestionForm.marks),
-        negative_marks: newQuestionForm.negative_marks === '' ? 0 : Number(newQuestionForm.negative_marks),
+      const payload: any = {
         test_id: activeTestForQuestions.id,
+        subject_id: activeTestForQuestions.subject_id ? parseInt(activeTestForQuestions.subject_id, 10) : undefined,
         subject: subjectName,
+        question_text: newQuestionForm.question_text,
+        question_type: newQuestionForm.question_type,
+        marks: newQuestionForm.marks === '' ? 2 : Number(newQuestionForm.marks),
+        negative_marks:
+          newQuestionForm.negative_marks === '' ? 0.5 : Number(newQuestionForm.negative_marks),
+        difficulty: newQuestionForm.difficulty,
+        explanation: newQuestionForm.explanation,
+        options: newQuestionForm.options,
       };
+
+      if (newQuestionForm.topic_id) {
+        payload.topic_id = parseInt(newQuestionForm.topic_id, 10);
+      } else if (activeTestForQuestions.topic_id) {
+        payload.topic_id = parseInt(activeTestForQuestions.topic_id, 10);
+      }
+
+      if (newQuestionForm.subtopic_id) {
+        payload.subtopic_id = parseInt(newQuestionForm.subtopic_id, 10);
+      } else if (activeTestForQuestions.subtopic_id) {
+        payload.subtopic_id = parseInt(activeTestForQuestions.subtopic_id, 10);
+      }
+
       await adminService.createQuestion(payload);
 
       setNewQuestionForm({
         question_text: '',
         question_type: 'MCQ',
-        marks: 1,
-        negative_marks: 0,
+        marks: 2,
+        negative_marks: activeTestForQuestions.negative_marking || 0.5,
         difficulty: 'Medium',
         explanation: '',
-        topic: '',
+        topic_id: activeTestForQuestions.topic_id ? String(activeTestForQuestions.topic_id) : '',
+        subtopic_id: activeTestForQuestions.subtopic_id ? String(activeTestForQuestions.subtopic_id) : '',
         options: [
           { option_text: '', option_key: 'A', is_correct: true, display_order: 1 },
           { option_text: '', option_key: 'B', is_correct: false, display_order: 2 },
@@ -656,12 +981,27 @@ export default function TestsPage() {
 
       await fetchTestQuestions(activeTestForQuestions.id);
       setQuestionTab('linked');
-      alert('New question created and attached to this test successfully!');
-    } catch (err) {
+      alert('New question created with topic tagging and attached successfully!');
+    } catch (err: any) {
       console.error('Failed to create question for test:', err);
-      alert('Failed to create question');
+      alert(err.response?.data?.error || 'Failed to create question');
     } finally {
       setCreatingQuestion(false);
+    }
+  };
+
+  const handleUnlinkQuestion = async (questionId: string | number) => {
+    if (!confirm('Unlink this question from this test? It will remain safely in the Question Bank.')) {
+      return;
+    }
+    try {
+      await adminService.updateQuestion(String(questionId), { test_id: null });
+      if (activeTestForQuestions) {
+        await fetchTestQuestions(activeTestForQuestions.id);
+      }
+    } catch (err) {
+      console.error('Failed to unlink question:', err);
+      alert('Failed to unlink question');
     }
   };
 
@@ -683,205 +1023,394 @@ export default function TestsPage() {
 
   return (
     <div className="flex flex-col h-full space-y-6 relative">
-      <header className="flex items-center justify-between">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Exam/Test Management</h1>
-          <p className="text-sm text-gray-500">Create tests, manage questions, and duplicate exams.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Topic-Wise & Exam Tests</h1>
+          <p className="text-sm text-gray-500">
+            Create topic-wise practice tests, auto-populate questions from Question Bank, and publish tests.
+          </p>
         </div>
         <button
           onClick={() => {
             resetForm();
             setIsCreateOpen(true);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm"
         >
-          <Plus className="w-4 h-4" /> Create New Test
+          <Plus className="w-4 h-4" /> Create Test
         </button>
       </header>
 
-      <section className="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 overflow-hidden">
-        <div className="p-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
+      {/* FILTER CONTROLS BAR */}
+      <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex-1 min-w-[240px] max-w-md relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by test name..."
+              placeholder="Search tests by title or topic..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <label className="text-xs font-semibold text-gray-500 whitespace-nowrap">Filter Exam:</label>
-            <select
-              value={selectedExamFilter}
-              onChange={(e) => setSelectedExamFilter(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            >
-              <option value="ALL">All Exams ({tests.length})</option>
-              {exams.map((ex) => {
-                const count = tests.filter((t) => String(t.exam_id) === String(ex.id)).length;
-                return (
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Test Type Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-2xs font-semibold text-gray-500">Type:</span>
+              <select
+                value={selectedTypeFilter}
+                onChange={(e) => setSelectedTypeFilter(e.target.value)}
+                className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                <option value="ALL">All Types</option>
+                <option value="topic_wise">🎯 Topic-Wise</option>
+                <option value="multi_topic">📚 Multi-Topic</option>
+                <option value="full_length">🏆 Full-Length</option>
+              </select>
+            </div>
+
+            {/* Exam Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-2xs font-semibold text-gray-500">Exam:</span>
+              <select
+                value={selectedExamFilter}
+                onChange={(e) => {
+                  setSelectedExamFilter(e.target.value);
+                  setSelectedTopicFilter('ALL');
+                }}
+                className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                <option value="ALL">All Exams</option>
+                {exams.map((ex) => (
                   <option key={ex.id} value={ex.id}>
-                    {ex.name} ({count})
+                    {ex.name}
                   </option>
-                );
-              })}
-              <option value="UNASSIGNED">Unassigned / General</option>
-            </select>
-            {selectedExamFilter !== 'ALL' && (
+                ))}
+                <option value="UNASSIGNED">Unassigned</option>
+              </select>
+            </div>
+
+            {/* Subject Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-2xs font-semibold text-gray-500">Subject:</span>
+              <select
+                value={selectedSubjectFilter}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedSubjectFilter(val);
+                  setSelectedTopicFilter('ALL');
+                  if (val !== 'ALL') {
+                    loadTopicsForSubject(val);
+                  }
+                }}
+                className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                <option value="ALL">All Subjects</option>
+                {subjects.map((sub) => (
+                  <option key={sub.id} value={sub.id}>
+                    {sub.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Topic Filter (When Subject is selected) */}
+            {selectedSubjectFilter !== 'ALL' && subjectTopicsMap[selectedSubjectFilter]?.length > 0 && (
+              <div className="flex items-center gap-1.5 animate-in fade-in">
+                <span className="text-2xs font-semibold text-gray-500">Topic:</span>
+                <select
+                  value={selectedTopicFilter}
+                  onChange={(e) => setSelectedTopicFilter(e.target.value)}
+                  className="px-2.5 py-1.5 bg-indigo-50/60 border border-indigo-200 rounded-lg text-xs font-semibold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                >
+                  <option value="ALL">All Topics</option>
+                  {subjectTopicsMap[selectedSubjectFilter].map((top) => (
+                    <option key={top.id} value={top.id}>
+                      {top.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Status Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-2xs font-semibold text-gray-500">Status:</span>
+              <select
+                value={selectedStatusFilter}
+                onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              >
+                <option value="ALL">All Status</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+              </select>
+            </div>
+
+            {(selectedExamFilter !== 'ALL' ||
+              selectedSubjectFilter !== 'ALL' ||
+              selectedTopicFilter !== 'ALL' ||
+              selectedTypeFilter !== 'ALL' ||
+              selectedStatusFilter !== 'ALL' ||
+              searchTerm) && (
               <button
                 type="button"
-                onClick={() => setSelectedExamFilter('ALL')}
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
+                onClick={() => {
+                  setSelectedExamFilter('ALL');
+                  setSelectedSubjectFilter('ALL');
+                  setSelectedTopicFilter('ALL');
+                  setSelectedTypeFilter('ALL');
+                  setSelectedStatusFilter('ALL');
+                  setSearchTerm('');
+                }}
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-2 py-1 rounded hover:bg-indigo-50 cursor-pointer"
               >
-                Reset
+                Clear Filters
               </button>
             )}
           </div>
         </div>
+      </section>
 
+      {/* TESTS TABLE */}
+      <section className="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50">
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
-                <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Test Name</th>
+                <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Test Details</th>
+                <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Hierarchy & Type</th>
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Config</th>
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Questions</th>
-                <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Publish Status</th>
                 <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center">
+                  <td colSpan={7} className="py-12 text-center">
                     <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mx-auto" />
                   </td>
                 </tr>
               ) : filteredTests.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-500">
-                    No tests found {selectedExamFilter !== 'ALL' ? 'for the selected exam' : ''}.
+                  <td colSpan={7} className="py-12 text-center text-gray-500 text-xs">
+                    No tests found matching the selected filters.
                   </td>
                 </tr>
               ) : (
-                filteredTests.map((test) => (
-                  <tr key={test.id} className="hover:bg-gray-50/50">
-                    <td className="py-3 px-5 text-sm text-gray-500">#{test.id}</td>
-                    <td className="py-3 px-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                          <FileText className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{test.title || test.name}</p>
-                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                            {test.exam_id && getExamName(test.exam_id) ? (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-                                {getExamName(test.exam_id)}
+                filteredTests.map((test) => {
+                  const isTopicWise = test.test_type === 'topic_wise' || !!test.topic_id;
+                  const isMultiTopic = test.test_type === 'multi_topic';
+                  const isPublished =
+                    !!test.is_published || String(test.status || '').toLowerCase() === 'published';
+                  const isToggling = togglingPublishId === String(test.id);
+
+                  return (
+                    <tr key={test.id} className="hover:bg-gray-50/60 transition-colors">
+                      <td className="py-3 px-5 text-xs font-mono text-gray-500">#{test.id}</td>
+
+                      {/* Test Title & Description */}
+                      <td className="py-3 px-5">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                              isTopicWise
+                                ? 'bg-indigo-50 text-indigo-600'
+                                : isMultiTopic
+                                ? 'bg-purple-50 text-purple-600'
+                                : 'bg-blue-50 text-blue-600'
+                            }`}
+                          >
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-semibold text-gray-900 text-sm">{test.name || test.title}</p>
+                              {test.is_free ? (
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-2xs font-bold bg-emerald-100 text-emerald-800">
+                                  FREE
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-2xs font-semibold bg-amber-100 text-amber-800">
+                                  PREMIUM
+                                </span>
+                              )}
+                              <span
+                                className={`inline-flex items-center px-1.5 py-0.2 rounded text-2xs font-semibold uppercase ${
+                                  test.difficulty === 'Hard' || test.difficulty === 'hard'
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : test.difficulty === 'Easy' || test.difficulty === 'easy'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : 'bg-amber-100 text-amber-700'
+                                }`}
+                              >
+                                {test.difficulty || 'Medium'}
                               </span>
-                            ) : (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-gray-100 text-gray-500">
-                                All Exams
-                              </span>
-                            )}
-                            <span className="text-xs text-gray-400">&bull;</span>
-                            <span className="text-xs text-gray-600 font-medium">
-                              {getSubjectName(test.subject_id)}
-                            </span>
-                            <span className="text-xs text-gray-400">&bull;</span>
-                            <span className="text-xs text-gray-500">
-                              Passing: {test.passing_marks || 0}/{test.total_marks || 0}
-                            </span>
+                            </div>
+                            {/* {test.description && (
+                              <p className="text-2xs text-gray-500 line-clamp-1 mt-0.5">{test.description}</p>
+                            )} */}
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-5">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Clock className="w-4 h-4 text-gray-400" /> {test.duration_minutes || test.duration || 60} mins
-                      </div>
-                    </td>
-                    <td className="py-3 px-5 text-sm font-medium text-gray-900">
-                      <button
-                        onClick={() => openManageQuestionsModal(test)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors"
-                        title="Click to manage questions"
-                      >
-                        <HelpCircle className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>{test.total_questions || test.questions_count || 0} Questions</span>
-                      </button>
-                    </td>
-                    <td className="py-3 px-5">
-                      {String(test.status || '').toLowerCase() === 'scheduled' ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
-                          Scheduled
-                        </span>
-                      ) : test.is_published || String(test.status || '').toLowerCase() === 'published' ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                          Published
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                          Draft
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {/* <button
+                      </td>
+
+                      {/* Hierarchy Tagging & Type */}
+                      <td className="py-3 px-5">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {isTopicWise ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                <Tag className="w-3 h-3 text-indigo-600" /> Topic-Wise
+                              </span>
+                            ) : isMultiTopic ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                <Layers className="w-3 h-3 text-purple-600" /> Multi-Topic
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                                Full-Length
+                              </span>
+                            )}
+                            {test.exam_id && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-gray-100 text-gray-700">
+                                {getExamName(test.exam_id)}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-2xs text-gray-600 font-medium flex items-center gap-1 flex-wrap">
+                            <span className="text-gray-900 font-semibold">{getSubjectName(test.subject_id)}</span>
+                            {test.topic_id && (
+                              <>
+                                <span className="text-gray-400">&rarr;</span>
+                                <span className="text-indigo-700 font-semibold">
+                                  {test.topic?.name || getTopicName(test.subject_id, test.topic_id)}
+                                </span>
+                              </>
+                            )}
+                            {test.subtopic_id && (
+                              <>
+                                <span className="text-gray-400">&bull;</span>
+                                <span className="text-emerald-700 font-medium">
+                                  {test.subtopic?.name || getSubtopicName(test.topic_id, test.subtopic_id)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Config */}
+                      <td className="py-3 px-5">
+                        <div className="text-xs text-gray-600 space-y-0.5">
+                          <div className="flex items-center gap-1 font-medium">
+                            <Clock className="w-3.5 h-3.5 text-gray-400" />
+                            <span>{test.duration_minutes || test.duration || 20}m</span>
+                            <span>&bull;</span>
+                            <span>{test.total_marks || 20} Marks</span>
+                          </div>
+                          <div className="text-2xs text-gray-500">
+                            Pass: {test.passing_marks || 8} | Neg: -{test.negative_marking ?? test.negative_marks ?? 0.5}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Questions count */}
+                      <td className="py-3 px-5">
+                        <button
                           onClick={() => openManageQuestionsModal(test)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-xs"
-                          title="Add / Manage Questions"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 transition-colors shadow-2xs"
+                          title="Manage Questions or Auto-Populate by Topic"
                         >
-                          <HelpCircle className="w-3.5 h-3.5" />
-                          <span>Questions</span>
-                        </button> */}
-                        <button
-                          onClick={() => openViewModal(test)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          title="View"
-                        >
-                          <Eye className="w-4 h-4" />
+                          <HelpCircle className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>{test.total_questions || test.questions_count || 0} Questions</span>
                         </button>
+                      </td>
+
+                      {/* Step 7: Fast One-Click Publish / Unpublish */}
+                      <td className="py-3 px-5">
                         <button
-                          onClick={() => openEditModal(test)}
-                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                          title="Edit"
+                          onClick={() => handleTogglePublish(test)}
+                          disabled={isToggling}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all shadow-2xs ${
+                            isPublished
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                              : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                          }`}
+                          title={isPublished ? 'Click to unpublish' : 'Click to publish instantly'}
                         >
-                          <Edit className="w-4 h-4" />
+                          {isToggling ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-current" />
+                          ) : isPublished ? (
+                            <Globe className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Lock className="w-3.5 h-3.5 text-gray-400" />
+                          )}
+                          <span>{isPublished ? 'Published' : 'Draft'}</span>
                         </button>
-                        <button
-                          onClick={() => handleDelete(test.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3 px-5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => {
+                              openManageQuestionsModal(test);
+                              setQuestionTab('auto_populate');
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Auto-Populate Questions from Bank"
+                          >
+                            <Zap className="w-4 h-4 text-amber-500" />
+                          </button>
+                          <button
+                            onClick={() => openViewModal(test)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="View Test"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => openEditModal(test)}
+                            className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Edit Test"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(test.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete Test"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </section>
 
-      {/* --- CREATE / EDIT TEST MODAL WITH DIRECT QUESTION ATTACHMENT --- */}
+      {/* --- CREATE / EDIT TEST MODAL --- */}
       {(isCreateOpen || isEditOpen) && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto flex flex-col">
-            <div className="flex justify-between items-center mb-5 pb-3 border-b border-gray-100">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto flex flex-col">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100 shrink-0">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">
-                  {isEditOpen ? 'Edit Test' : 'Create New Test'}
+                <h3 className="text-lg font-bold text-gray-900">
+                  {isEditOpen ? 'Edit Test' : 'Create Topic-Wise / Full-Length Test'}
                 </h3>
                 <p className="text-xs text-gray-500">
-                  Configure test settings and add questions directly.
+                  Configure hierarchy targeting (Subject &rarr; Topic &rarr; Subtopic) and parameters.
                 </p>
               </div>
               <button
@@ -889,102 +1418,257 @@ export default function TestsPage() {
                   setIsCreateOpen(false);
                   setIsEditOpen(false);
                 }}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded-lg"
+                className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={isEditOpen ? handleEdit : handleCreate} className="space-y-5 flex-1">
-              {/* Test Name */}
+            <form onSubmit={isEditOpen ? handleEdit : handleCreate} className="space-y-4 flex-1">
+              {/* Test Type Selector */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Test Title / Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g., Physics Mock Test 1"
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">Test Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, test_type: 'topic_wise' })}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                      form.test_type === 'topic_wise'
+                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 ring-1 ring-indigo-600'
+                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Tag className="w-3.5 h-3.5" />
+                    <span>Topic-Wise</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, test_type: 'multi_topic' })}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                      form.test_type === 'multi_topic'
+                        ? 'border-purple-600 bg-purple-50/70 text-purple-700 ring-1 ring-purple-600'
+                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>Multi-Topic Chapter</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, test_type: 'full_length' })}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                      form.test_type === 'full_length'
+                        ? 'border-blue-600 bg-blue-50/70 text-blue-700 ring-1 ring-blue-600'
+                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Full-Length Mock</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Target Exam & Subject Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Target Exam */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-gray-700">
-                      Target Exam <span className="text-red-500">*</span>
-                    </label>
-                    {loadingExamSubjects && (
-                      <span className="text-2xs text-indigo-600 flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Loading subjects...
-                      </span>
-                    )}
-                  </div>
-                  <select
-                    required
-                    value={form.exam_id}
-                    onChange={(e) => handleExamChange(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                  >
-                    <option value="">Select an exam</option>
-                    {exams.map((exam: any) => (
-                      <option key={exam.id} value={exam.id}>
-                        {exam.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-2xs text-gray-400 mt-1">
-                    Relates this test specifically to this exam.
-                  </p>
-                </div>
-
-                {/* Subject */}
+              {/* Test Name & Description */}
+              <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Subject <span className="text-red-500">*</span>
+                    Test Name / Title <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <input
+                    type="text"
                     required
-                    value={form.subject_id}
-                    onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                  >
-                    <option value="" disabled>
-                      Select a subject
-                    </option>
-                    {availableSubjectsForModal.map((sub: any) => (
-                      <option key={sub.id} value={sub.id}>
-                        {sub.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-2xs text-gray-400 mt-1">
-                    {form.exam_id && examSubjectsMap[form.exam_id]?.length
-                      ? `Showing ${examSubjectsMap[form.exam_id].length} subject(s) in this exam`
-                      : 'All available subjects'}
-                  </p>
+                    placeholder="e.g. SSC CGL Mathematics: Percentage Practice Test 01"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Description</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Topic-wise practice test for Percentage"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
                 </div>
               </div>
 
-              {/* Numbers Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 p-3.5 rounded-xl border border-gray-200">
+              {/* Hierarchy Cascade: Exam -> Subject -> Topic -> Subtopic */}
+              <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200 space-y-3">
+                <span className="text-2xs font-bold uppercase tracking-wider text-gray-500 block">
+                  Hierarchy Targeting
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Target Exam */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Target Exam</label>
+                    <select
+                      value={form.exam_id}
+                      onChange={(e) => handleExamChange(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="">Select an Exam (or General)</option>
+                      {exams.map((ex) => (
+                        <option key={ex.id} value={ex.id}>
+                          {ex.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Subject */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Subject <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={form.subject_id}
+                      onChange={(e) => handleSubjectChange(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="">Select a Subject</option>
+                      {availableSubjectsForModal.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Topic & Subtopic Row for Topic-Wise Test */}
+                {form.test_type === 'topic_wise' && form.subject_id && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-gray-200/60 animate-in fade-in">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-gray-700">
+                          Topic <span className="text-red-500">*</span>
+                        </label>
+                        {loadingTopics && (
+                          <span className="text-3xs text-indigo-600 flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" /> Loading topics...
+                          </span>
+                        )}
+                      </div>
+                      <select
+                        required
+                        value={form.topic_id}
+                        onChange={(e) => handleTopicChange(e.target.value)}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-medium"
+                      >
+                        <option value="">Select a Topic</option>
+                        {currentAvailableTopics.map((top) => (
+                          <option key={top.id} value={top.id}>
+                            {top.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-gray-700">
+                          Subtopic (Optional)
+                        </label>
+                        {loadingSubtopics && (
+                          <span className="text-3xs text-emerald-600 flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" /> Loading subtopics...
+                          </span>
+                        )}
+                      </div>
+                      <select
+                        value={form.subtopic_id}
+                        onChange={(e) => setForm({ ...form, subtopic_id: e.target.value })}
+                        disabled={!form.topic_id || currentAvailableSubtopics.length === 0}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white disabled:bg-gray-100"
+                      >
+                        <option value="">
+                          {!form.topic_id
+                            ? 'First select a topic'
+                            : currentAvailableSubtopics.length === 0
+                            ? 'No subtopics available'
+                            : 'Select a Subtopic'}
+                        </option>
+                        {currentAvailableSubtopics.map((subtop) => (
+                          <option key={subtop.id} value={subtop.id}>
+                            {subtop.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Multi-Topic Chapter Test Topic Badges */}
+                {form.test_type === 'multi_topic' && form.subject_id && (
+                  <div className="pt-1 border-t border-gray-200/60 animate-in fade-in">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                      Select Topics for this Chapter Test:
+                    </label>
+                    <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2 bg-white rounded-lg border border-gray-200">
+                      {currentAvailableTopics.length === 0 ? (
+                        <span className="text-2xs text-gray-400 italic">No topics found for this subject</span>
+                      ) : (
+                        currentAvailableTopics.map((top) => {
+                          const isSelected = form.topic_ids.includes(Number(top.id));
+                          return (
+                            <button
+                              type="button"
+                              key={top.id}
+                              onClick={() => {
+                                const idNum = Number(top.id);
+                                if (isSelected) {
+                                  setForm({
+                                    ...form,
+                                    topic_ids: form.topic_ids.filter((id) => id !== idNum),
+                                  });
+                                } else {
+                                  setForm({
+                                    ...form,
+                                    topic_ids: [...form.topic_ids, idNum],
+                                  });
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                                isSelected
+                                  ? 'bg-purple-100 text-purple-800 border border-purple-300 font-bold'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                              }`}
+                            >
+                              <Tag className="w-3 h-3 text-purple-600" />
+                              <span>{top.name}</span>
+                              {isSelected && <Check className="w-3 h-3 text-purple-700" />}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Numbers Grid: Duration, Marks, Pass, Negative, Difficulty */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 bg-gray-50 p-3 rounded-xl border border-gray-200">
                 <div>
                   <label className="block text-2xs font-bold text-gray-700 mb-1">Duration (m)</label>
                   <input
                     type="number"
                     min="1"
-                    value={form.duration}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
-                      setForm({ ...form, duration: cleaned === '' ? '' : Number(cleaned) });
-                    }}
-                    className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                    value={form.duration_minutes}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        duration_minutes: e.target.value === '' ? '' : Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg bg-white"
                   />
                 </div>
                 <div>
@@ -993,12 +1677,13 @@ export default function TestsPage() {
                     type="number"
                     min="1"
                     value={form.total_marks}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
-                      setForm({ ...form, total_marks: cleaned === '' ? '' : Number(cleaned) });
-                    }}
-                    className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        total_marks: e.target.value === '' ? '' : Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg bg-white"
                   />
                 </div>
                 <div>
@@ -1007,36 +1692,78 @@ export default function TestsPage() {
                     type="number"
                     min="0"
                     value={form.passing_marks}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
-                      setForm({ ...form, passing_marks: cleaned === '' ? '' : Number(cleaned) });
-                    }}
-                    className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        passing_marks: e.target.value === '' ? '' : Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-2xs font-bold text-gray-700 mb-1">Total Questions</label>
+                  <label className="block text-2xs font-bold text-gray-700 mb-1">Negative Mark</label>
                   <input
                     type="number"
-                    readOnly
-                    value={stagedQuestions.length}
-                    className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg bg-gray-100 text-indigo-700 font-bold cursor-not-allowed"
-                    title="Automatically matches questions added below"
+                    step="0.25"
+                    min="0"
+                    value={form.negative_marking}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        negative_marking: e.target.value === '' ? '' : Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg bg-white"
                   />
+                </div>
+                <div>
+                  <label className="block text-2xs font-bold text-gray-700 mb-1">Difficulty</label>
+                  <select
+                    value={form.difficulty}
+                    onChange={(e) => setForm({ ...form, difficulty: e.target.value })}
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg bg-white font-medium"
+                  >
+                    <option value="Easy">Easy</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Hard">Hard</option>
+                  </select>
                 </div>
               </div>
 
-              {/* DIRECT QUESTIONS SECTION */}
+              {/* Free & Publish Checkboxes */}
+              <div className="flex flex-wrap items-center gap-6 pt-1">
+                <label className="flex items-center gap-2 text-xs font-semibold text-gray-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.is_free}
+                    onChange={(e) => setForm({ ...form, is_free: e.target.checked })}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                  />
+                  <span>Mark as Free Practice Test (accessible without subscription)</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs font-semibold text-gray-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.is_published}
+                    onChange={(e) => setForm({ ...form, is_published: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                  />
+                  <span>Publish Immediately (Available to students)</span>
+                </label>
+              </div>
+
+              {/* QUESTIONS SECTION (Step 6) */}
               <div className="pt-2 border-t border-gray-200">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <div>
-                    <label className="block text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                    <label className="block text-xs font-bold text-gray-900 flex items-center gap-1.5">
                       <HelpCircle className="w-4 h-4 text-indigo-600" />
-                      <span>Questions in this Test ({stagedQuestions.length})</span>
+                      <span>Questions attached to this Test ({stagedQuestions.length})</span>
                     </label>
                     <p className="text-2xs text-gray-500">
-                      Add questions now so this test is complete and ready to take upon creation.
+                      Add questions now or auto-populate from the Question Bank.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1047,7 +1774,7 @@ export default function TestsPage() {
                         setBankSearchTerm('');
                         setIsPickFromBankOpen(true);
                       }}
-                      className="px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
+                      className="px-2.5 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1"
                     >
                       <Search className="w-3.5 h-3.5" />
                       <span>Pick from Bank</span>
@@ -1055,7 +1782,7 @@ export default function TestsPage() {
                     <button
                       type="button"
                       onClick={() => setIsQuickCreateQuestionOpen(true)}
-                      className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
+                      className="px-2.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-1 shadow-xs"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>New Question</span>
@@ -1064,40 +1791,34 @@ export default function TestsPage() {
                 </div>
 
                 {stagedQuestions.length > 0 ? (
-                  <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100 max-h-56 overflow-y-auto bg-gray-50">
+                  <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100 max-h-48 overflow-y-auto bg-gray-50">
                     {stagedQuestions.map((q, idx) => (
                       <div
                         key={q.id || `draft-${idx}`}
-                        className="p-3 bg-white flex items-start justify-between gap-3 hover:bg-gray-50/80 transition-colors"
+                        className="p-2.5 bg-white flex items-start justify-between gap-3 hover:bg-gray-50/80 transition-colors"
                       >
-                        <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                          <span className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                        <div className="flex items-start gap-2 flex-1 min-w-0">
+                          <span className="w-5 h-5 rounded bg-indigo-50 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                             {idx + 1}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
+                            <div className="flex items-center gap-1.5 mb-0.5">
                               {q.is_new_draft && (
                                 <span className="px-1.5 py-0.2 rounded text-2xs font-bold bg-amber-100 text-amber-800">
-                                  New Draft
+                                  Draft
                                 </span>
                               )}
                               <span
                                 className={`px-1.5 py-0.2 rounded text-2xs font-semibold uppercase ${
                                   q.difficulty === 'Hard' || q.difficulty === 'hard'
                                     ? 'bg-rose-100 text-rose-700'
-                                    : q.difficulty === 'Medium' || q.difficulty === 'medium'
-                                    ? 'bg-amber-100 text-amber-700'
                                     : 'bg-emerald-100 text-emerald-700'
                                 }`}
                               >
                                 {q.difficulty || 'Medium'}
                               </span>
-                              <span className="text-2xs text-gray-500 font-medium">
-                                Marks: {q.marks || 1}
-                              </span>
-                              <span className="text-2xs text-gray-500 font-medium">
-                                Neg: -{q.negative_marks || 0}
-                              </span>
+                              <span className="text-2xs text-gray-500 font-medium">Marks: {q.marks || 1}</span>
+                              <span className="text-2xs text-gray-500 font-medium">Neg: -{q.negative_marks || 0}</span>
                             </div>
                             <p className="text-xs font-medium text-gray-900 truncate">
                               {q.question_text || q.question || q.text}
@@ -1111,7 +1832,7 @@ export default function TestsPage() {
                             updated.splice(idx, 1);
                             setStagedQuestions(updated);
                           }}
-                          className="p-1 text-gray-400 hover:text-rose-600 rounded-md transition-colors"
+                          className="p-1 text-gray-400 hover:text-rose-600 rounded"
                           title="Remove from test"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1120,34 +1841,17 @@ export default function TestsPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="border border-dashed border-gray-300 rounded-xl p-6 text-center bg-gray-50/50">
-                    <HelpCircle className="w-8 h-8 text-gray-300 mx-auto mb-1.5" />
-                    <p className="text-xs font-medium text-gray-700 mb-0.5">
-                      No questions attached yet
-                    </p>
+                  <div className="border border-dashed border-gray-300 rounded-xl p-5 text-center bg-gray-50/50">
+                    <p className="text-xs font-semibold text-gray-700 mb-0.5">No questions attached yet</p>
                     <p className="text-2xs text-gray-500">
-                      Use <strong>&quot;Pick from Bank&quot;</strong> or{' '}
-                      <strong>&quot;+ New Question&quot;</strong> above to add questions now, or you can add them later.
+                      You can add questions now or auto-populate them after saving.
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* Publish option */}
-              <div className="pt-2">
-                <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.is_published}
-                    onChange={(e) => setForm({ ...form, is_published: e.target.checked })}
-                    className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
-                  />
-                  <span>Publish Immediately (Make available to students)</span>
-                </label>
-              </div>
-
               {/* Modal Actions */}
-              <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 mt-4">
+              <div className="pt-3 flex justify-end gap-3 border-t border-gray-100 mt-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -1164,13 +1868,7 @@ export default function TestsPage() {
                   className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition-colors disabled:opacity-50 flex items-center gap-2 shadow-xs"
                 >
                   {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  <span>
-                    {isEditOpen
-                      ? 'Save Changes'
-                      : stagedQuestions.length > 0
-                      ? `Create Test with ${stagedQuestions.length} Question(s)`
-                      : 'Create Test'}
-                  </span>
+                  <span>{isEditOpen ? 'Save Changes' : 'Create Test'}</span>
                 </button>
               </div>
             </form>
@@ -1178,111 +1876,94 @@ export default function TestsPage() {
         </div>
       )}
 
-      {/* --- SUB-MODAL 1: PICK FROM BANK DURING CREATE / EDIT TEST --- */}
+      {/* --- SUB-MODAL: PICK FROM BANK DURING CREATE / EDIT --- */}
       {isPickFromBankOpen && (
-        <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-5 animate-in fade-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
-            <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <Search className="w-5 h-5 text-indigo-600" />
-                <h4 className="text-base font-bold text-gray-900">Pick from Question Bank</h4>
-              </div>
+        <div className="fixed inset-0 z-60 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
+              <h4 className="text-base font-bold text-gray-900">Select Questions from Question Bank</h4>
               <button
-                type="button"
                 onClick={() => setIsPickFromBankOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+                className="text-gray-400 hover:text-gray-600 p-1"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="relative mb-3">
+            <div className="mb-3 relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search questions by text or topic..."
                 value={bankSearchTerm}
                 onChange={(e) => setBankSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs"
               />
             </div>
 
-            <div className="flex-1 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100 bg-gray-50/50">
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
               {loadingBankForPicker ? (
-                <div className="p-8 text-center">
+                <div className="py-12 text-center">
                   <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500">Loading questions from bank...</p>
+                  <p className="text-xs text-gray-500">Searching Question Bank...</p>
                 </div>
               ) : availableBankQuestions.length === 0 ? (
-                <div className="p-8 text-center text-xs text-gray-500">
-                  No available questions found matching your search.
-                </div>
+                <p className="text-xs text-gray-500 text-center py-8">
+                  No questions found in Question Bank matching criteria.
+                </p>
               ) : (
                 availableBankQuestions.map((q) => {
                   const isChecked = selectedBankIdsToAdd.has(Number(q.id));
                   return (
-                    <label
+                    <div
                       key={q.id}
-                      className={`flex items-start gap-3 p-3 cursor-pointer transition-colors ${
-                        isChecked ? 'bg-indigo-50/60' : 'bg-white hover:bg-gray-50'
+                      onClick={() => {
+                        const updated = new Set(selectedBankIdsToAdd);
+                        if (isChecked) updated.delete(Number(q.id));
+                        else updated.add(Number(q.id));
+                        setSelectedBankIdsToAdd(updated);
+                      }}
+                      className={`p-3 rounded-xl border text-xs cursor-pointer flex items-start gap-3 transition-colors ${
+                        isChecked
+                          ? 'border-indigo-500 bg-indigo-50/60'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={isChecked}
-                        onChange={() => {
-                          const updated = new Set(selectedBankIdsToAdd);
-                          if (updated.has(Number(q.id))) {
-                            updated.delete(Number(q.id));
-                          } else {
-                            updated.add(Number(q.id));
-                          }
-                          setSelectedBankIdsToAdd(updated);
-                        }}
-                        className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                        onChange={() => {}}
+                        className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-2xs font-mono text-gray-400">#{q.id}</span>
-                          <span
-                            className={`px-1.5 py-0.2 rounded text-2xs font-semibold uppercase ${
-                              q.difficulty === 'Hard' || q.difficulty === 'hard'
-                                ? 'bg-rose-100 text-rose-700'
-                                : q.difficulty === 'Medium' || q.difficulty === 'medium'
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-emerald-100 text-emerald-700'
-                            }`}
-                          >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono text-gray-400 text-3xs">#{q.id}</span>
+                          <span className="px-1.5 py-0.2 rounded text-3xs font-semibold uppercase bg-gray-100 text-gray-700">
                             {q.difficulty || 'Medium'}
                           </span>
-                          {q.subject && (
-                            <span className="text-2xs bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded">
-                              {q.subject}
+                          {q.topic && (
+                            <span className="text-3xs text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded">
+                              {q.topic}
                             </span>
                           )}
-                          <span className="text-2xs text-gray-500 ml-auto font-medium">
-                            Marks: {q.marks || 1}
-                          </span>
                         </div>
-                        <p className="text-xs font-medium text-gray-900 line-clamp-2">
+                        <p className="font-medium text-gray-900 line-clamp-2">
                           {q.question_text || q.question || q.text}
                         </p>
                       </div>
-                    </label>
+                    </div>
                   );
                 })
               )}
             </div>
 
-            <div className="pt-3 flex items-center justify-between border-t border-gray-100 mt-3">
-              <span className="text-xs text-gray-500">
-                {selectedBankIdsToAdd.size} question(s) selected
-              </span>
+            <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-xs text-gray-500">{selectedBankIdsToAdd.size} selected</span>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setIsPickFromBankOpen(false)}
-                  className="px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-lg"
+                  className="px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 rounded-lg font-medium"
                 >
                   Cancel
                 </button>
@@ -1290,7 +1971,7 @@ export default function TestsPage() {
                   type="button"
                   onClick={handleAddSelectedFromPicker}
                   disabled={selectedBankIdsToAdd.size === 0}
-                  className="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50 shadow-xs"
+                  className="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
                 >
                   Add Selected ({selectedBankIdsToAdd.size})
                 </button>
@@ -1300,115 +1981,67 @@ export default function TestsPage() {
         </div>
       )}
 
-      {/* --- SUB-MODAL 2: QUICK CREATE QUESTION DURING CREATE / EDIT TEST --- */}
+      {/* --- SUB-MODAL: QUICK CREATE QUESTION DURING CREATE / EDIT --- */}
       {isQuickCreateQuestionOpen && (
-        <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-5 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-indigo-600" />
-                <h4 className="text-base font-bold text-gray-900">Add New Question</h4>
-              </div>
+        <div className="fixed inset-0 z-60 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
+              <h4 className="text-base font-bold text-gray-900">Add New Question Draft</h4>
               <button
-                type="button"
                 onClick={() => setIsQuickCreateQuestionOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+                className="text-gray-400 hover:text-gray-600 p-1"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddQuickDraftQuestion} className="space-y-3.5">
+            <form onSubmit={handleAddQuickDraftQuestion} className="space-y-3 flex-1 overflow-y-auto pr-1">
               <div>
-                <label className="block text-2xs font-bold text-gray-700 mb-1">
-                  Question Text <span className="text-rose-500">*</span>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Question Text <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   required
-                  rows={2}
-                  placeholder="Enter question text..."
+                  rows={3}
+                  placeholder="Enter question text here..."
                   value={quickQuestionForm.question_text}
                   onChange={(e) =>
                     setQuickQuestionForm({ ...quickQuestionForm, question_text: e.target.value })
                   }
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none bg-white"
+                  className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
-              {/* Options */}
-              <div className="space-y-1.5">
-                <label className="block text-2xs font-bold text-gray-700">
-                  Options (Radio marks the correct option)
-                </label>
-                <div className="space-y-1.5">
-                  {quickQuestionForm.options.map((opt, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex items-center gap-2 p-2 rounded-lg border text-xs bg-white ${
-                        opt.is_correct ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-200'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="quick_create_opt"
-                        checked={opt.is_correct}
-                        onChange={() => setCorrectOptionInQuickForm(idx)}
-                        className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 shrink-0"
-                      />
-                      <span className="font-bold text-gray-700 text-xs">{opt.option_key}.</span>
-                      <input
-                        type="text"
-                        required
-                        placeholder={`Option ${opt.option_key}...`}
-                        value={opt.option_text}
-                        onChange={(e) => {
-                          const opts = [...quickQuestionForm.options];
-                          opts[idx].option_text = e.target.value;
-                          setQuickQuestionForm({ ...quickQuestionForm, options: opts });
-                        }}
-                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Marks & Difficulty */}
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block text-2xs font-bold text-gray-700 mb-1">Marks</label>
                   <input
                     type="number"
-                    min="0"
-                    step="0.5"
+                    min="1"
                     value={quickQuestionForm.marks}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
+                    onChange={(e) =>
                       setQuickQuestionForm({
                         ...quickQuestionForm,
-                        marks: cleaned === '' ? '' : Number(cleaned),
-                      });
-                    }}
-                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                        marks: e.target.value === '' ? '' : Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
                   />
                 </div>
                 <div>
                   <label className="block text-2xs font-bold text-gray-700 mb-1">Negative</label>
                   <input
                     type="number"
-                    min="0"
                     step="0.25"
+                    min="0"
                     value={quickQuestionForm.negative_marks}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
+                    onChange={(e) =>
                       setQuickQuestionForm({
                         ...quickQuestionForm,
-                        negative_marks: cleaned === '' ? '' : Number(cleaned),
-                      });
-                    }}
-                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                        negative_marks: e.target.value === '' ? '' : Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
                   />
                 </div>
                 <div>
@@ -1418,7 +2051,7 @@ export default function TestsPage() {
                     onChange={(e) =>
                       setQuickQuestionForm({ ...quickQuestionForm, difficulty: e.target.value })
                     }
-                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white"
                   >
                     <option value="Easy">Easy</option>
                     <option value="Medium">Medium</option>
@@ -1427,24 +2060,53 @@ export default function TestsPage() {
                 </div>
               </div>
 
+              {/* Options */}
+              <div className="space-y-2 pt-1">
+                <label className="block text-xs font-bold text-gray-700">Options (Select Correct)</label>
+                {quickQuestionForm.options.map((opt, idx) => (
+                  <div key={opt.option_key} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="quick_correct"
+                      checked={opt.is_correct}
+                      onChange={() => setCorrectOptionInQuickForm(idx)}
+                      className="text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="w-5 text-xs font-bold text-gray-600">{opt.option_key}.</span>
+                    <input
+                      type="text"
+                      required
+                      placeholder={`Option ${opt.option_key} text`}
+                      value={opt.option_text}
+                      onChange={(e) => {
+                        const updated = [...quickQuestionForm.options];
+                        updated[idx].option_text = e.target.value;
+                        setQuickQuestionForm({ ...quickQuestionForm, options: updated });
+                      }}
+                      className="flex-1 px-2.5 py-1 text-xs border border-gray-300 rounded"
+                    />
+                  </div>
+                ))}
+              </div>
+
               <div>
-                <label className="block text-2xs font-bold text-gray-700 mb-1">Explanation (Optional)</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Explanation</label>
                 <input
                   type="text"
-                  placeholder="Optional brief explanation..."
+                  placeholder="Optional answer explanation"
                   value={quickQuestionForm.explanation}
                   onChange={(e) =>
                     setQuickQuestionForm({ ...quickQuestionForm, explanation: e.target.value })
                   }
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                  className="w-full px-2.5 py-1 text-xs border border-gray-300 rounded"
                 />
               </div>
 
-              <div className="pt-2 flex justify-end gap-2 border-t border-gray-100">
+              <div className="pt-3 border-t border-gray-100 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsQuickCreateQuestionOpen(false)}
-                  className="px-3.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-lg"
+                  className="px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 rounded-lg font-medium"
                 >
                   Cancel
                 </button>
@@ -1452,7 +2114,7 @@ export default function TestsPage() {
                   type="submit"
                   className="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs"
                 >
-                  Attach to this Test
+                  Add Draft Question
                 </button>
               </div>
             </form>
@@ -1460,52 +2122,32 @@ export default function TestsPage() {
         </div>
       )}
 
-      {/* --- STANDALONE MANAGE QUESTIONS MODAL (FROM TABLE ACTION) --- */}
+      {/* --- DEDICATED MANAGE QUESTIONS MODAL (STEP 6) --- */}
       {isManageQuestionsOpen && activeTestForQuestions && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-100 flex items-start justify-between bg-gradient-to-r from-gray-50 to-indigo-50/30">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
-                  <HelpCircle className="w-6 h-6" />
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-200 bg-gray-50/50 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-gray-900">
+                    {activeTestForQuestions.name || activeTestForQuestions.title}
+                  </h3>
+                  <span className="text-xs font-mono text-gray-400">#{activeTestForQuestions.id}</span>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xl font-bold text-gray-900">
-                      {activeTestForQuestions.title || activeTestForQuestions.name}
-                    </h3>
-                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-700">
-                      #{activeTestForQuestions.id}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
-                    {activeTestForQuestions.exam_id && (
-                      <>
-                        <span>
-                          Exam: <strong>{getExamName(activeTestForQuestions.exam_id)}</strong>
-                        </span>
-                        <span>&bull;</span>
-                      </>
-                    )}
-                    <span>
-                      Subject: <strong>{getSubjectName(activeTestForQuestions.subject_id)}</strong>
-                    </span>
-                    <span>&bull;</span>
-                    <span>
-                      Duration:{' '}
-                      <strong>
-                        {activeTestForQuestions.duration_minutes ||
-                          activeTestForQuestions.duration ||
-                          60}
-                        m
-                      </strong>
-                    </span>
-                    <span>&bull;</span>
-                    <span>
-                      Total Marks: <strong>{activeTestForQuestions.total_marks || 100}</strong>
-                    </span>
-                  </p>
+                <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                  <span>{getSubjectName(activeTestForQuestions.subject_id)}</span>
+                  {activeTestForQuestions.topic_id && (
+                    <>
+                      <span>&rarr;</span>
+                      <span className="font-semibold text-indigo-700">
+                        {activeTestForQuestions.topic?.name ||
+                          getTopicName(activeTestForQuestions.subject_id, activeTestForQuestions.topic_id)}
+                      </span>
+                    </>
+                  )}
+                  <span>&bull;</span>
+                  <span>{testQuestions.length} Questions</span>
                 </div>
               </div>
               <button
@@ -1516,11 +2158,11 @@ export default function TestsPage() {
               </button>
             </div>
 
-            {/* Sub-header Navigation Tabs */}
-            <div className="flex border-b border-gray-200 bg-white px-6 gap-6">
+            {/* Navigation Tabs (4 Options from Step 6) */}
+            <div className="flex border-b border-gray-200 bg-white px-6 gap-6 overflow-x-auto">
               <button
                 onClick={() => setQuestionTab('linked')}
-                className={`py-3.5 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+                className={`py-3 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
                   questionTab === 'linked'
                     ? 'border-indigo-600 text-indigo-600'
                     : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -1528,26 +2170,38 @@ export default function TestsPage() {
               >
                 <Layers className="w-4 h-4" />
                 <span>Linked Questions</span>
-                <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-700 font-bold">
+                <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700 font-bold text-3xs">
                   {testQuestions.length}
                 </span>
               </button>
 
               <button
+                onClick={() => setQuestionTab('auto_populate')}
+                className={`py-3 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
+                  questionTab === 'auto_populate'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                <Zap className="w-4 h-4 text-amber-500" />
+                <span>Auto-Populate by Topic</span>
+              </button>
+
+              <button
                 onClick={() => setQuestionTab('bank')}
-                className={`py-3.5 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+                className={`py-3 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
                   questionTab === 'bank'
                     ? 'border-indigo-600 text-indigo-600'
                     : 'border-transparent text-gray-500 hover:text-gray-800'
                 }`}
               >
                 <Search className="w-4 h-4" />
-                <span>Pick from Question Bank</span>
+                <span>Pick from Bank</span>
               </button>
 
               <button
                 onClick={() => setQuestionTab('create')}
-                className={`py-3.5 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+                className={`py-3 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
                   questionTab === 'create'
                     ? 'border-indigo-600 text-indigo-600'
                     : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -1559,146 +2213,137 @@ export default function TestsPage() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 flex-1 overflow-y-auto bg-gray-50/50">
+            <div className="p-5 flex-1 overflow-y-auto bg-gray-50/50">
               {/* TAB 1: LINKED QUESTIONS */}
               {questionTab === 'linked' && (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-sm font-bold text-gray-800">
+                      <h4 className="text-xs font-bold text-gray-800">
                         Questions in this Test ({testQuestions.length})
                       </h4>
-                      <p className="text-xs text-gray-500">
-                        These questions will be presented to students when attempting this test.
+                      <p className="text-2xs text-gray-500">
+                        These questions are presented to students taking this test.
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setQuestionTab('bank')}
-                        className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 hover:bg-gray-50 text-indigo-600 rounded-lg shadow-xs flex items-center gap-1.5"
+                        onClick={() => setQuestionTab('auto_populate')}
+                        className="px-2.5 py-1 text-2xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg flex items-center gap-1"
                       >
-                        <Search className="w-3.5 h-3.5" /> Pick from Bank
+                        <Zap className="w-3 h-3 text-amber-600" /> Auto-Populate
+                      </button>
+                      <button
+                        onClick={() => setQuestionTab('bank')}
+                        className="px-2.5 py-1 text-2xs font-semibold bg-white border border-gray-200 hover:bg-gray-50 text-indigo-600 rounded-lg flex items-center gap-1 shadow-2xs"
+                      >
+                        <Search className="w-3 h-3" /> Pick Bank
                       </button>
                       <button
                         onClick={() => setQuestionTab('create')}
-                        className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs flex items-center gap-1.5"
+                        className="px-2.5 py-1 text-2xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-1 shadow-2xs"
                       >
-                        <Plus className="w-3.5 h-3.5" /> Create New
+                        <Plus className="w-3 h-3" /> Create New
                       </button>
                     </div>
                   </div>
 
                   {loadingTestQuestions ? (
-                    <div className="py-16 text-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-2" />
-                      <p className="text-xs text-gray-500">Loading questions for this test...</p>
+                    <div className="py-12 text-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto mb-2" />
+                      <p className="text-xs text-gray-500">Loading test questions...</p>
                     </div>
                   ) : testQuestions.length === 0 ? (
-                    <div className="bg-white border-2 border-dashed border-gray-200 rounded-xl p-12 text-center">
-                      <HelpCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <h5 className="font-bold text-gray-800 mb-1">No questions added yet</h5>
-                      <p className="text-xs text-gray-500 max-w-md mx-auto mb-5">
-                        This test doesn&apos;t have any questions linked yet. You can pick existing
-                        questions from your Question Bank or create new questions specifically for
-                        this test.
+                    <div className="bg-white border-2 border-dashed border-gray-200 rounded-xl p-10 text-center">
+                      <HelpCircle className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                      <h5 className="font-bold text-gray-800 text-sm mb-1">No questions added yet</h5>
+                      <p className="text-xs text-gray-500 max-w-sm mx-auto mb-4">
+                        Use Auto-Populate to instantly grab questions from this topic, or pick existing questions from the bank.
                       </p>
-                      <div className="flex justify-center gap-3">
+                      <div className="flex justify-center gap-2">
                         <button
-                          onClick={() => setQuestionTab('bank')}
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs"
+                          onClick={() => setQuestionTab('auto_populate')}
+                          className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs"
                         >
-                          Pick from Question Bank
+                          <Zap className="w-3.5 h-3.5" /> Auto-Populate from Topic
                         </button>
                         <button
-                          onClick={() => setQuestionTab('create')}
-                          className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-semibold"
+                          onClick={() => setQuestionTab('bank')}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs"
                         >
-                          Create New Question
+                          Pick from Question Bank
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       {testQuestions.map((q, idx) => {
                         const isExpanded = expandedQuestionId === q.id;
                         return (
                           <div
                             key={q.id || idx}
-                            className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs hover:border-gray-300 transition-all"
+                            className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs hover:border-gray-300 transition-all text-xs"
                           >
                             <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-start gap-3 flex-1">
-                                <span className="w-6 h-6 rounded-md bg-indigo-50 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                              <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                                <span className="w-5 h-5 rounded bg-indigo-50 text-indigo-700 font-bold flex items-center justify-center shrink-0 mt-0.5 text-2xs">
                                   {idx + 1}
                                 </span>
-                                <div className="flex-1">
-                                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                                    <span className="text-xs font-mono font-semibold text-gray-400">
-                                      #{q.id}
-                                    </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                    <span className="font-mono text-gray-400 text-3xs">#{q.id}</span>
                                     <span
-                                      className={`px-2 py-0.5 rounded text-2xs font-semibold uppercase ${
+                                      className={`px-1.5 py-0.2 rounded text-3xs font-semibold uppercase ${
                                         q.difficulty === 'Hard' || q.difficulty === 'hard'
                                           ? 'bg-rose-100 text-rose-700'
-                                          : q.difficulty === 'Medium' || q.difficulty === 'medium'
-                                          ? 'bg-amber-100 text-amber-700'
                                           : 'bg-emerald-100 text-emerald-700'
                                       }`}
                                     >
                                       {q.difficulty || 'Medium'}
                                     </span>
-                                    <span className="text-xs text-gray-500 font-medium">
-                                      Marks: <strong className="text-gray-800">{q.marks || 1}</strong>
-                                    </span>
-                                    <span className="text-xs text-gray-500 font-medium">
-                                      Neg:{' '}
-                                      <strong className="text-rose-600">
-                                        -{q.negative_marks || 0}
-                                      </strong>
-                                    </span>
+                                    <span className="text-3xs text-gray-500 font-medium">Marks: {q.marks || 1}</span>
+                                    <span className="text-3xs text-gray-500 font-medium">Neg: -{q.negative_marks || 0}</span>
                                   </div>
-                                  <p className="text-sm font-medium text-gray-900 leading-relaxed">
+                                  <p className="font-medium text-gray-900">
                                     {q.question_text || q.question || q.text}
                                   </p>
 
-                                  {/* Expandable options view */}
-                                  {isExpanded && q.options && q.options.length > 0 && (
-                                    <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-2">
-                                      {q.options.map((opt: any, optIdx: number) => (
+                                  {/* Expanded Options */}
+                                  {isExpanded && q.options && (
+                                    <div className="mt-2.5 pt-2 border-t border-gray-100 space-y-1.5">
+                                      {q.options.map((opt: any) => (
                                         <div
-                                          key={opt.id || optIdx}
-                                          className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
+                                          key={opt.id || opt.option_key}
+                                          className={`p-1.5 rounded flex items-center gap-2 ${
                                             opt.is_correct
-                                              ? 'border-emerald-500 bg-emerald-50/50 text-emerald-900 font-semibold'
-                                              : 'border-gray-200 bg-gray-50 text-gray-700'
+                                              ? 'bg-emerald-50 text-emerald-900 border border-emerald-200 font-semibold'
+                                              : 'bg-gray-50 text-gray-700'
                                           }`}
                                         >
-                                          <span className="w-5 h-5 rounded-full bg-white border border-gray-300 flex items-center justify-center font-bold text-2xs">
-                                            {opt.option_key || String.fromCharCode(65 + optIdx)}
-                                          </span>
-                                          <span className="flex-1">{opt.option_text}</span>
+                                          <span className="w-4 font-bold">{opt.option_key}.</span>
+                                          <span>{opt.option_text}</span>
                                           {opt.is_correct && (
-                                            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 ml-auto" />
                                           )}
                                         </div>
                                       ))}
                                       {q.explanation && (
-                                        <div className="col-span-full mt-1 p-2 bg-indigo-50/50 rounded-lg text-xs text-indigo-900">
+                                        <p className="text-2xs text-gray-600 bg-amber-50 p-2 rounded mt-1">
                                           <strong>Explanation:</strong> {q.explanation}
-                                        </div>
+                                        </p>
                                       )}
                                     </div>
                                   )}
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {q.options && q.options.length > 0 && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                {q.options && (
                                   <button
                                     onClick={() =>
                                       setExpandedQuestionId(isExpanded ? null : q.id)
                                     }
-                                    className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg text-xs flex items-center gap-1 font-medium transition-colors"
+                                    className="p-1 text-gray-400 hover:text-indigo-600 rounded"
                                     title={isExpanded ? 'Hide options' : 'View options'}
                                   >
                                     {isExpanded ? (
@@ -1710,7 +2355,7 @@ export default function TestsPage() {
                                 )}
                                 <button
                                   onClick={() => handleUnlinkQuestion(q.id)}
-                                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                  className="p-1 text-gray-400 hover:text-rose-600 rounded"
                                   title="Unlink from this test"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -1725,28 +2370,111 @@ export default function TestsPage() {
                 </div>
               )}
 
-              {/* TAB 2: PICK FROM QUESTION BANK */}
-              {questionTab === 'bank' && (
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="relative flex-1 max-w-md">
-                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              {/* TAB 2: AUTO-POPULATE BY TOPIC (STEP 6 OPTION 2) */}
+              {questionTab === 'auto_populate' && (
+                <form onSubmit={handleAutoPopulate} className="space-y-4 max-w-md mx-auto py-4">
+                  <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl flex items-start gap-3">
+                    <Zap className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-900 space-y-1">
+                      <p className="font-bold">Auto-Populate from Question Bank</p>
+                      <p className="text-2xs leading-relaxed text-amber-800">
+                        Automatically selects questions tagged with the target topic and difficulty
+                        from your Question Bank and links them directly to this test.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Target Topic <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={autoPopulateTopicId}
+                      onChange={(e) => setAutoPopulateTopicId(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                    >
+                      <option value="">Select a Topic</option>
+                      {(subjectTopicsMap[activeTestForQuestions.subject_id] || []).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Number of Questions
+                      </label>
                       <input
-                        type="text"
-                        placeholder="Search question bank by text or topic..."
-                        value={bankSearch}
-                        onChange={(e) => setBankSearch(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={autoPopulateCount}
+                        onChange={(e) => setAutoPopulateCount(Number(e.target.value))}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                       />
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Difficulty</label>
+                      <select
+                        value={autoPopulateDifficulty}
+                        onChange={(e) => setAutoPopulateDifficulty(e.target.value)}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                      >
+                        <option value="Easy">Easy</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Hard">Hard</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={autoPopulating}
+                      className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {autoPopulating ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Auto-Populating Questions...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4" />
+                          <span>Populate {autoPopulateCount} Questions Now</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* TAB 3: PICK FROM QUESTION BANK (STEP 6 OPTION 1) */}
+              {questionTab === 'bank' && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="relative flex-1 max-w-sm">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search question bank..."
+                        value={bankSearch}
+                        onChange={(e) => setBankSearch(e.target.value)}
+                        className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={toggleSelectAllBank}
-                        className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg"
+                        className="px-2.5 py-1 text-xs font-medium bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg"
                       >
-                        {selectedBankQuestionIds.size === bankQuestions.length &&
-                        bankQuestions.length > 0
+                        {selectedBankQuestionIds.size === bankQuestions.length && bankQuestions.length > 0
                           ? 'Deselect All'
                           : 'Select All'}
                       </button>
@@ -1754,38 +2482,38 @@ export default function TestsPage() {
                       <button
                         onClick={handleAddSelectedFromBank}
                         disabled={selectedBankQuestionIds.size === 0 || addingFromBank}
-                        className="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50 shadow-xs flex items-center gap-1.5 transition-colors"
+                        className="px-3 py-1 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50 shadow-xs flex items-center gap-1.5"
                       >
                         {addingFromBank ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                           <Plus className="w-3.5 h-3.5" />
                         )}
-                        <span>Add Selected ({selectedBankQuestionIds.size}) to Test</span>
+                        <span>Assign Selected ({selectedBankQuestionIds.size})</span>
                       </button>
                     </div>
                   </div>
 
                   {loadingBankQuestions ? (
-                    <div className="py-16 text-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-2" />
+                    <div className="py-12 text-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto mb-2" />
                       <p className="text-xs text-gray-500">Searching Question Bank...</p>
                     </div>
                   ) : bankQuestions.length === 0 ? (
                     <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-gray-500 text-xs">
-                      No available questions found in the Question Bank matching your search.
+                      No questions found in Question Bank matching your filters.
                     </div>
                   ) : (
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
                       {bankQuestions.map((q) => {
                         const isSelected = selectedBankQuestionIds.has(Number(q.id));
                         return (
                           <div
                             key={q.id}
                             onClick={() => toggleSelectBankQuestion(Number(q.id))}
-                            className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
+                            className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 text-xs ${
                               isSelected
-                                ? 'bg-indigo-50/60 border-indigo-500 ring-1 ring-indigo-500'
+                                ? 'bg-indigo-50/70 border-indigo-500 ring-1 ring-indigo-500'
                                 : 'bg-white border-gray-200 hover:border-gray-300'
                             }`}
                           >
@@ -1793,42 +2521,31 @@ export default function TestsPage() {
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleSelectBankQuestion(Number(q.id))}
-                              className="mt-1 w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                              className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
                             />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-mono font-semibold text-gray-400">
-                                  #{q.id}
-                                </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className="font-mono text-gray-400 text-3xs">#{q.id}</span>
                                 <span
-                                  className={`px-2 py-0.5 rounded text-2xs font-semibold uppercase ${
+                                  className={`px-1.5 py-0.2 rounded text-3xs font-semibold uppercase ${
                                     q.difficulty === 'Hard' || q.difficulty === 'hard'
                                       ? 'bg-rose-100 text-rose-700'
-                                      : q.difficulty === 'Medium' || q.difficulty === 'medium'
-                                      ? 'bg-amber-100 text-amber-700'
                                       : 'bg-emerald-100 text-emerald-700'
                                   }`}
                                 >
                                   {q.difficulty || 'Medium'}
                                 </span>
-                                {q.subject && (
-                                  <span className="text-2xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                                    {q.subject}
-                                  </span>
-                                )}
                                 {q.topic && (
-                                  <span className="text-2xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                  <span className="text-3xs text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded">
                                     {q.topic}
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs font-medium text-gray-900 line-clamp-2">
+                              <p className="font-medium text-gray-900 line-clamp-2">
                                 {q.question_text || q.question || q.text}
                               </p>
                             </div>
-                            <div className="text-right text-xs text-gray-500 shrink-0">
-                              <span>Marks: {q.marks || 1}</span>
-                            </div>
+                            <span className="text-2xs text-gray-500 shrink-0">Marks: {q.marks || 1}</span>
                           </div>
                         );
                       })}
@@ -1837,109 +2554,81 @@ export default function TestsPage() {
                 </div>
               )}
 
-              {/* TAB 3: CREATE NEW QUESTION FOR THIS TEST */}
+              {/* TAB 4: CREATE NEW QUESTION WITH TOPIC TAGGING (STEP 6 OPTION 3) */}
               {questionTab === 'create' && (
-                <form onSubmit={handleCreateNewQuestionForTest} className="space-y-4">
-                  <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3.5 flex items-center gap-3">
-                    <Sparkles className="w-5 h-5 text-indigo-600 shrink-0" />
-                    <p className="text-xs text-indigo-900 leading-relaxed">
-                      This question will be saved into the master Question Bank and automatically
-                      attached to <strong>{activeTestForQuestions.title || activeTestForQuestions.name}</strong>.
-                    </p>
+                <form onSubmit={handleCreateNewQuestionForTest} className="space-y-3 max-w-xl mx-auto py-2">
+                  <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-center gap-2.5 text-xs text-indigo-900">
+                    <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span>
+                      This question will be saved into the master Question Bank with topic tags and linked to{' '}
+                      <strong>{activeTestForQuestions.name || activeTestForQuestions.title}</strong>.
+                    </span>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Question Text <span className="text-rose-500">*</span>
+                      Question Text <span className="text-red-500">*</span>
                     </label>
                     <textarea
                       required
                       rows={3}
+                      placeholder="e.g. If the price of sugar increases by 25%, by what percent must a family decrease consumption?"
                       value={newQuestionForm.question_text}
                       onChange={(e) =>
                         setNewQuestionForm({ ...newQuestionForm, question_text: e.target.value })
                       }
-                      placeholder="Type your question prompt here..."
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none bg-white"
+                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
-                  {/* Options */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-gray-700">
-                      Options (Select the correct option with the radio button)
-                    </label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                      {newQuestionForm.options.map((opt, idx) => (
-                        <div
-                          key={idx}
-                          className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs bg-white ${
-                            opt.is_correct ? 'border-emerald-500 bg-emerald-50/20' : 'border-gray-200'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="new_test_correct_opt"
-                            checked={opt.is_correct}
-                            onChange={() => setCorrectOptionInNewForm(idx)}
-                            className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 shrink-0"
-                          />
-                          <span className="font-bold text-gray-700">{opt.option_key}.</span>
-                          <input
-                            type="text"
-                            required
-                            placeholder={`Option ${opt.option_key} text...`}
-                            value={opt.option_text}
-                            onChange={(e) => {
-                              const opts = [...newQuestionForm.options];
-                              opts[idx].option_text = e.target.value;
-                              setNewQuestionForm({ ...newQuestionForm, options: opts });
-                            }}
-                            className="flex-1 px-2.5 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-                      ))}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                      <label className="block text-2xs font-bold text-gray-700 mb-1">Type</label>
+                      <select
+                        value={newQuestionForm.question_type}
+                        onChange={(e) =>
+                          setNewQuestionForm({ ...newQuestionForm, question_type: e.target.value })
+                        }
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+                      >
+                        <option value="MCQ">MCQ</option>
+                        <option value="Numerical">Numerical</option>
+                      </select>
                     </div>
-                  </div>
 
-                  {/* Marks & Difficulty */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-2xs font-bold text-gray-700 mb-1">Marks</label>
                       <input
                         type="number"
-                        min="0"
-                        step="0.5"
+                        min="1"
                         value={newQuestionForm.marks}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => {
-                          const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
+                        onChange={(e) =>
                           setNewQuestionForm({
                             ...newQuestionForm,
-                            marks: cleaned === '' ? '' : Number(cleaned),
-                          });
-                        }}
-                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                            marks: e.target.value === '' ? '' : Number(e.target.value),
+                          })
+                        }
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-2xs font-bold text-gray-700 mb-1">Negative Marks</label>
+                      <label className="block text-2xs font-bold text-gray-700 mb-1">Negative</label>
                       <input
                         type="number"
-                        min="0"
                         step="0.25"
+                        min="0"
                         value={newQuestionForm.negative_marks}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => {
-                          const cleaned = e.target.value.replace(/^0+(?=\d)/, '');
+                        onChange={(e) =>
                           setNewQuestionForm({
                             ...newQuestionForm,
-                            negative_marks: cleaned === '' ? '' : Number(cleaned),
-                          });
-                        }}
-                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                            negative_marks: e.target.value === '' ? '' : Number(e.target.value),
+                          })
+                        }
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
                       />
                     </div>
+
                     <div>
                       <label className="block text-2xs font-bold text-gray-700 mb-1">Difficulty</label>
                       <select
@@ -1947,55 +2636,65 @@ export default function TestsPage() {
                         onChange={(e) =>
                           setNewQuestionForm({ ...newQuestionForm, difficulty: e.target.value })
                         }
-                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white"
                       >
                         <option value="Easy">Easy</option>
                         <option value="Medium">Medium</option>
                         <option value="Hard">Hard</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-2xs font-bold text-gray-700 mb-1">Topic</label>
-                      <input
-                        type="text"
-                        placeholder="Optional topic tag..."
-                        value={newQuestionForm.topic}
-                        onChange={(e) =>
-                          setNewQuestionForm({ ...newQuestionForm, topic: e.target.value })
-                        }
-                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                      />
-                    </div>
+                  </div>
+
+                  {/* Options */}
+                  <div className="space-y-2 pt-1">
+                    <label className="block text-xs font-bold text-gray-700">Options (Mark Correct)</label>
+                    {newQuestionForm.options.map((opt, idx) => (
+                      <div key={opt.option_key} className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="create_correct"
+                          checked={opt.is_correct}
+                          onChange={() => setCorrectOptionInNewForm(idx)}
+                          className="text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="w-5 text-xs font-bold text-gray-600">{opt.option_key}.</span>
+                        <input
+                          type="text"
+                          required
+                          placeholder={`Option ${opt.option_key} text`}
+                          value={opt.option_text}
+                          onChange={(e) => {
+                            const updated = [...newQuestionForm.options];
+                            updated[idx].option_text = e.target.value;
+                            setNewQuestionForm({ ...newQuestionForm, options: updated });
+                          }}
+                          className="flex-1 px-2.5 py-1 text-xs border border-gray-300 rounded"
+                        />
+                      </div>
+                    ))}
                   </div>
 
                   <div>
-                    <label className="block text-2xs font-bold text-gray-700 mb-1">Explanation (Optional)</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Explanation</label>
                     <textarea
                       rows={2}
+                      placeholder="e.g. Required reduction = [25 / (100 + 25)] * 100 = 20%."
                       value={newQuestionForm.explanation}
                       onChange={(e) =>
                         setNewQuestionForm({ ...newQuestionForm, explanation: e.target.value })
                       }
-                      placeholder="Explain why the selected option is correct..."
-                      className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none bg-white"
+                      className="w-full px-2.5 py-1 text-xs border border-gray-300 rounded"
                     />
                   </div>
 
-                  <div className="pt-2 flex justify-end gap-2 border-t border-gray-200">
-                    <button
-                      type="button"
-                      onClick={() => setQuestionTab('linked')}
-                      className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                      Cancel
-                    </button>
+                  <div className="pt-2 flex justify-end gap-2">
                     <button
                       type="submit"
                       disabled={creatingQuestion}
-                      className="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs flex items-center gap-1.5 disabled:opacity-50"
                     >
                       {creatingQuestion && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      <span>Save & Link to Test</span>
+                      <span>Create and Link Question</span>
                     </button>
                   </div>
                 </form>
@@ -2003,14 +2702,14 @@ export default function TestsPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-gray-200 bg-white flex items-center justify-between">
+            <div className="p-3.5 border-t border-gray-200 bg-white flex items-center justify-between">
               <span className="text-xs text-gray-500">
-                {testQuestions.length} question(s) attached to this test
+                {testQuestions.length} question(s) currently attached
               </span>
               <button
                 type="button"
                 onClick={() => setIsManageQuestionsOpen(false)}
-                className="px-4 py-2 text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                className="px-4 py-1.5 text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
               >
                 Close
               </button>
@@ -2019,94 +2718,101 @@ export default function TestsPage() {
         </div>
       )}
 
-      {/* --- PREVIEW MODAL --- */}
+      {/* --- PREVIEW / VIEW MODAL --- */}
       {isViewOpen && viewData && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-lg w-full p-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="text-lg font-bold text-gray-900">Test Preview</h3>
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
+              <h3 className="text-base font-bold text-gray-900">Test Overview</h3>
               <button
                 onClick={() => setIsViewOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-400 hover:text-gray-600 p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-6">
-              <div className="p-4 bg-indigo-50 rounded-lg flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-white shadow-sm flex items-center justify-center text-indigo-600">
-                  <FileText className="w-6 h-6" />
+            <div className="space-y-4">
+              <div className="p-4 bg-indigo-50/70 rounded-xl flex items-start gap-3 border border-indigo-100">
+                <div className="w-10 h-10 rounded-lg bg-white shadow-2xs flex items-center justify-center text-indigo-600 shrink-0">
+                  <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-bold text-gray-900">{viewData.title || viewData.name}</h4>
-                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                    {viewData.exam_id && getExamName(viewData.exam_id) ? (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-                        {getExamName(viewData.exam_id)}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-gray-100 text-gray-500">
-                        All Exams
-                      </span>
-                    )}
-                    <span className="text-xs text-gray-400">&bull;</span>
-                    <span className="text-xs text-gray-600 font-medium">
-                      {getSubjectName(viewData.subject_id)}
-                    </span>
-                    <span className="text-xs text-gray-400">&bull;</span>
-                    <span className="text-xs text-gray-500">ID: #{viewData.id}</span>
-                  </div>
+                  <h4 className="text-base font-bold text-gray-900">{viewData.name || viewData.title}</h4>
+                  <p className="text-xs text-gray-600 mt-0.5">{viewData.description || 'No description'}</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Duration</p>
-                  <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
-                    <Clock className="w-4 h-4 text-gray-400" /> {viewData.duration_minutes || viewData.duration || 60} mins
-                  </p>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-150">
+                  <span className="text-3xs uppercase tracking-wider text-gray-500 font-bold block mb-0.5">
+                    Test Type
+                  </span>
+                  <span className="text-xs font-semibold text-indigo-700">
+                    {viewData.test_type === 'topic_wise' || viewData.topic_id
+                      ? 'Topic-Wise Test'
+                      : viewData.test_type === 'multi_topic'
+                      ? 'Multi-Topic Test'
+                      : 'Full-Length Test'}
+                  </span>
                 </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Status</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {viewData.is_published ? (
-                      <span className="text-green-600 font-semibold">Published</span>
+
+                <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-150">
+                  <span className="text-3xs uppercase tracking-wider text-gray-500 font-bold block mb-0.5">
+                    Access & Status
+                  </span>
+                  <span className="text-xs font-semibold text-gray-900 flex items-center gap-1.5">
+                    {viewData.is_free ? (
+                      <span className="text-emerald-700 font-bold">Free</span>
                     ) : (
-                      <span className="text-gray-600 font-semibold">Draft</span>
+                      <span className="text-amber-700 font-bold">Premium</span>
                     )}
+                    <span>&bull;</span>
+                    {viewData.is_published ? (
+                      <span className="text-emerald-600 font-bold">Published</span>
+                    ) : (
+                      <span className="text-gray-500">Draft</span>
+                    )}
+                  </span>
+                </div>
+
+                <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-150">
+                  <span className="text-3xs uppercase tracking-wider text-gray-500 font-bold block mb-0.5">
+                    Subject & Topic
+                  </span>
+                  <p className="text-xs font-medium text-gray-800">
+                    {getSubjectName(viewData.subject_id)}
+                    {viewData.topic_id && ` → ${viewData.topic?.name || getTopicName(viewData.subject_id, viewData.topic_id)}`}
                   </p>
                 </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Passing Marks</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {viewData.passing_marks || 0} / {viewData.total_marks || 0}
-                  </p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Questions</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {viewData.total_questions || viewData.questions_count || 0}
+
+                <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-150">
+                  <span className="text-3xs uppercase tracking-wider text-gray-500 font-bold block mb-0.5">
+                    Duration & Marks
+                  </span>
+                  <p className="text-xs font-medium text-gray-800">
+                    {viewData.duration_minutes || viewData.duration || 20}m | Pass: {viewData.passing_marks || 0}/
+                    {viewData.total_marks || 0}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="pt-4 flex justify-between mt-6 border-t border-gray-100">
+            <div className="pt-4 mt-4 border-t border-gray-100 flex justify-between items-center">
               <button
                 type="button"
                 onClick={() => {
                   setIsViewOpen(false);
                   openManageQuestionsModal(viewData);
                 }}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-xs transition-colors shadow-xs"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs"
               >
                 Manage Questions
               </button>
               <button
                 type="button"
                 onClick={() => setIsViewOpen(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition-colors text-xs"
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200"
               >
                 Close Preview
               </button>

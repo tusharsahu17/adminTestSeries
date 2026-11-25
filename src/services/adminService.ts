@@ -1,4 +1,4 @@
-import { getData, postData, putData, deleteData } from './apiClient';
+import { getData, postData, putData, patchData, deleteData } from './apiClient';
 import { analyticsService } from './admin/analyticsService';
 import { enrollmentService } from './admin/enrollmentService';
 import { paymentService } from './admin/paymentService';
@@ -151,28 +151,37 @@ export const adminService = {
   createSubject: async (data: any) => {
     return await postData('/api/subjects', data);
   },
-  updateSubject: async (id: string, data: any) => {
+  updateSubject: async (id: string | number, data: any) => {
     return await putData(`/api/subjects/${id}`, data);
   },
-  deleteSubject: async (id: string) => {
+  deleteSubject: async (id: string | number) => {
     return await deleteData(`/api/subjects/${id}`);
   },
   
-  getTopics: async (subjectId: string) => {
+  getTopics: async (subjectId: string | number) => {
     return await getData(`/api/admin/hierarchy/subjects/${subjectId}/topics`);
   },
-  createTopic: async (subjectId: string, data: any) => {
+  createTopic: async (subjectId: string | number, data: any) => {
     return await postData(`/api/admin/hierarchy/subjects/${subjectId}/topics`, data);
   },
-  updateTopic: async (id: string, data: any) => {
+  updateTopic: async (id: string | number, data: any) => {
     return await putData(`/api/admin/hierarchy/topics/${id}`, data);
   },
-  deleteTopic: async (id: string) => {
+  deleteTopic: async (id: string | number) => {
     return await deleteData(`/api/admin/hierarchy/topics/${id}`);
   },
   
-  getSubtopics: async (topicId: string) => {
+  getSubtopics: async (topicId: string | number) => {
     return await getData(`/api/admin/hierarchy/topics/${topicId}/subtopics`);
+  },
+  createSubtopic: async (topicId: string | number, data: any) => {
+    return await postData(`/api/admin/hierarchy/topics/${topicId}/subtopics`, data);
+  },
+  updateSubtopic: async (id: string | number, data: any) => {
+    return await putData(`/api/admin/hierarchy/subtopics/${id}`, data);
+  },
+  deleteSubtopic: async (id: string | number) => {
+    return await deleteData(`/api/admin/hierarchy/subtopics/${id}`);
   },
 
   // Exams
@@ -182,21 +191,33 @@ export const adminService = {
   createExam: async (data: any) => {
     return await postData('/api/exams', data);
   },
-  updateExam: async (id: string, data: any) => {
+  updateExam: async (id: string | number, data: any) => {
     return await putData(`/api/exams/${id}`, data);
   },
-  deleteExam: async (id: string) => {
+  deleteExam: async (id: string | number) => {
     return await deleteData(`/api/exams/${id}`);
   },
   
-  getExamSubjects: async (examId: string) => {
+  getExamSubjects: async (examId: string | number) => {
     return await getData(`/api/exams/${examId}/subjects`);
   },
-  addExamSubject: async (examId: string, subjectId: string) => {
-    return await postData(`/api/exams/${examId}/subjects`, { subjectId });
+  addExamSubject: async (examId: string | number, subjectId: string | number, displayOrder?: number) => {
+    return await postData(`/api/exams/${examId}/subjects`, {
+      subjectId: Number(subjectId),
+      ...(displayOrder !== undefined ? { displayOrder: Number(displayOrder) } : {}),
+    });
   },
-  removeExamSubject: async (examId: string, subjectId: string) => {
+  removeExamSubject: async (examId: string | number, subjectId: string | number) => {
     return await deleteData(`/api/exams/${examId}/subjects/${subjectId}`);
+  },
+  getExamHierarchy: async (examId: string | number) => {
+    return await getData(`/api/exams/${examId}/hierarchy`);
+  },
+  getExamTests: async (examId: string | number, params?: any) => {
+    return await getData(`/api/exams/${examId}/tests`, params);
+  },
+  getSubjectTests: async (subjectId: string | number, params?: any) => {
+    return await getData(`/api/subjects/${subjectId}/tests`, params);
   },
   
   // Test Series (Legacy / Fallback - test series removed in backend)
@@ -246,20 +267,50 @@ export const adminService = {
   getTests: async (params?: any) => {
     return await getData('/api/admin/tests', params);
   },
+  getTestsByTopic: async (topicId: string | number, params?: any) => {
+    return await getData('/api/tests', {
+      topic_id: topicId,
+      test_type: 'topic_wise',
+      ...params,
+    });
+  },
   getTestDetails: async (id: string | number) => {
     return await getData(`/api/admin/tests/${id}`);
   },
   createTest: async (data: any) => {
     return await postData('/api/admin/tests', data);
   },
-  updateTest: async (id: string, data: any) => {
+  updateTest: async (id: string | number, data: any) => {
     return await putData(`/api/admin/tests/${id}`, data);
   },
-  deleteTest: async (id: string) => {
+  deleteTest: async (id: string | number) => {
     return await deleteData(`/api/admin/tests/${id}`);
   },
   duplicateTest: async (id: string | number) => {
     return await postData(`/api/admin/tests/${id}/duplicate`);
+  },
+  publishTest: async (id: string | number, isPublished: boolean = true) => {
+    return await patchData(`/api/admin/tests/${id}/publish`, {
+      is_published: isPublished,
+    });
+  },
+  assignQuestionsToTest: async (
+    testId: string | number,
+    questionIds: (number | string)[]
+  ) => {
+    return await postData(`/api/admin/tests/${testId}/questions`, {
+      question_ids: questionIds.map(Number),
+    });
+  },
+  autoPopulateTestQuestions: async (
+    testId: string | number,
+    payload: { count: number; topic_id: number | string; difficulty?: string }
+  ) => {
+    return await postData(`/api/admin/tests/${testId}/questions/auto-populate`, {
+      count: Number(payload.count),
+      topic_id: Number(payload.topic_id),
+      ...(payload.difficulty ? { difficulty: payload.difficulty } : {}),
+    });
   },
   
   // Questions
