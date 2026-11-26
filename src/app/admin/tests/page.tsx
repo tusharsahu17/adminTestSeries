@@ -1400,31 +1400,77 @@ export default function TestsPage() {
         </div>
       </section>
 
-      {/* --- CREATE / EDIT TEST MODAL --- */}
+      {/* --- CREATE / EDIT TEST 2-PART MODAL --- */}
       {(isCreateOpen || isEditOpen) && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto flex flex-col">
-            <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100 shrink-0">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">
-                  {isEditOpen ? 'Edit Test' : 'Create Topic-Wise / Full-Length Test'}
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Configure hierarchy targeting (Subject &rarr; Topic &rarr; Subtopic) and parameters.
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-7xl w-full h-[90vh] flex flex-col overflow-hidden">
+          {/* Top Sticky Header */}
+          <div className="px-6 py-3.5 border-b border-gray-200 bg-white flex items-center justify-between gap-4 shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-gray-900 truncate">
+                    {isEditOpen ? 'Edit Test' : 'Create Topic-Wise / Full-Length Test'}
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70">
+                    {form.test_type === 'topic_wise'
+                      ? 'Topic-Wise'
+                      : form.test_type === 'multi_topic'
+                      ? 'Multi-Topic'
+                      : 'Full-Length'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-500 truncate">
+                  Configure test settings on the left and manage attached questions on the right.
                 </p>
               </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 shrink-0">
               <button
+                type="button"
                 onClick={() => {
                   setIsCreateOpen(false);
                   setIsEditOpen(false);
                 }}
-                className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg"
+                className="px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="test-editor-form"
+                disabled={submitting}
+                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition-colors disabled:opacity-50 flex items-center gap-2 shadow-xs"
+              >
+                {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isEditOpen ? 'Save Changes' : 'Create Test'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  setIsEditOpen(false);
+                }}
+                className="text-gray-400 hover:text-gray-600 p-1.5 hover:bg-gray-100 rounded-lg ml-1"
+                title="Close"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
+          </div>
 
-            <form onSubmit={isEditOpen ? handleEdit : handleCreate} className="space-y-4 flex-1">
+          {/* 2-Column Split Body */}
+          <form
+            id="test-editor-form"
+            onSubmit={isEditOpen ? handleEdit : handleCreate}
+            className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 overflow-hidden"
+          >
+            {/* PART 1 (LEFT): TEST CONFIGURATION */}
+            <div className="lg:col-span-6 overflow-y-auto p-6 space-y-4 border-b lg:border-b-0 lg:border-r border-gray-200 bg-white">
               {/* Test Type Selector */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5">Test Type</label>
@@ -1500,7 +1546,7 @@ export default function TestsPage() {
 
               {/* Hierarchy Cascade: Exam -> Subject -> Topic -> Subtopic */}
               <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200 space-y-3">
-                <span className="text-2xs font-bold uppercase tracking-wider text-gray-500 block">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
                   Hierarchy Targeting
                 </span>
 
@@ -1545,14 +1591,14 @@ export default function TestsPage() {
 
                 {/* Topic & Subtopic Row for Topic-Wise Test */}
                 {form.test_type === 'topic_wise' && form.subject_id && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-gray-200/60 animate-in fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-200/60 animate-in fade-in">
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="block text-xs font-semibold text-gray-700">
                           Topic <span className="text-red-500">*</span>
                         </label>
                         {loadingTopics && (
-                          <span className="text-3xs text-indigo-600 flex items-center gap-1">
+                          <span className="text-[10px] text-indigo-600 flex items-center gap-1">
                             <Loader2 className="w-3 h-3 animate-spin" /> Loading topics...
                           </span>
                         )}
@@ -1578,7 +1624,7 @@ export default function TestsPage() {
                           Subtopic (Optional)
                         </label>
                         {loadingSubtopics && (
-                          <span className="text-3xs text-emerald-600 flex items-center gap-1">
+                          <span className="text-[10px] text-emerald-600 flex items-center gap-1">
                             <Loader2 className="w-3 h-3 animate-spin" /> Loading subtopics...
                           </span>
                         )}
@@ -1608,13 +1654,13 @@ export default function TestsPage() {
 
                 {/* Multi-Topic Chapter Test Topic Badges */}
                 {form.test_type === 'multi_topic' && form.subject_id && (
-                  <div className="pt-1 border-t border-gray-200/60 animate-in fade-in">
+                  <div className="pt-2 border-t border-gray-200/60 animate-in fade-in">
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                       Select Topics for this Chapter Test:
                     </label>
-                    <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2 bg-white rounded-lg border border-gray-200">
+                    <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2.5 bg-white rounded-lg border border-gray-200">
                       {currentAvailableTopics.length === 0 ? (
-                        <span className="text-2xs text-gray-400 italic">No topics found for this subject</span>
+                        <span className="text-[11px] text-gray-400 italic">No topics found for this subject</span>
                       ) : (
                         currentAvailableTopics.map((top) => {
                           const isSelected = form.topic_ids.includes(Number(top.id));
@@ -1655,9 +1701,9 @@ export default function TestsPage() {
               </div>
 
               {/* Numbers Grid: Duration, Marks, Pass, Negative, Difficulty */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 bg-gray-50 p-3 rounded-xl border border-gray-200">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 bg-gray-50 p-3.5 rounded-xl border border-gray-200">
                 <div>
-                  <label className="block text-2xs font-bold text-gray-700 mb-1">Duration (m)</label>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-1">Duration (m)</label>
                   <input
                     type="number"
                     min="1"
@@ -1672,7 +1718,7 @@ export default function TestsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-2xs font-bold text-gray-700 mb-1">Total Marks</label>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-1">Total Marks</label>
                   <input
                     type="number"
                     min="1"
@@ -1687,7 +1733,7 @@ export default function TestsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-2xs font-bold text-gray-700 mb-1">Pass Marks</label>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-1">Pass Marks</label>
                   <input
                     type="number"
                     min="0"
@@ -1702,7 +1748,7 @@ export default function TestsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-2xs font-bold text-gray-700 mb-1">Negative Mark</label>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-1">Negative Mark</label>
                   <input
                     type="number"
                     step="0.25"
@@ -1718,7 +1764,7 @@ export default function TestsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-2xs font-bold text-gray-700 mb-1">Difficulty</label>
+                  <label className="block text-[10px] font-bold text-gray-700 mb-1">Difficulty</label>
                   <select
                     value={form.difficulty}
                     onChange={(e) => setForm({ ...form, difficulty: e.target.value })}
@@ -1732,7 +1778,7 @@ export default function TestsPage() {
               </div>
 
               {/* Free & Publish Checkboxes */}
-              <div className="flex flex-wrap items-center gap-6 pt-1">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 pt-1">
                 <label className="flex items-center gap-2 text-xs font-semibold text-gray-800 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1740,7 +1786,7 @@ export default function TestsPage() {
                     onChange={(e) => setForm({ ...form, is_free: e.target.checked })}
                     className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
                   />
-                  <span>Mark as Free Practice Test (accessible without subscription)</span>
+                  <span>Mark as Free Practice Test</span>
                 </label>
 
                 <label className="flex items-center gap-2 text-xs font-semibold text-gray-800 cursor-pointer">
@@ -1750,77 +1796,88 @@ export default function TestsPage() {
                     onChange={(e) => setForm({ ...form, is_published: e.target.checked })}
                     className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                   />
-                  <span>Publish Immediately (Available to students)</span>
+                  <span>Publish Immediately</span>
                 </label>
               </div>
+            </div>
 
-              {/* QUESTIONS SECTION (Step 6) */}
-              <div className="pt-2 border-t border-gray-200">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                      <HelpCircle className="w-4 h-4 text-indigo-600" />
-                      <span>Questions attached to this Test ({stagedQuestions.length})</span>
-                    </label>
-                    <p className="text-2xs text-gray-500">
-                      Add questions now or auto-populate from the Question Bank.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedBankIdsToAdd(new Set());
-                        setBankSearchTerm('');
-                        setIsPickFromBankOpen(true);
-                      }}
-                      className="px-2.5 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1"
-                    >
-                      <Search className="w-3.5 h-3.5" />
-                      <span>Pick from Bank</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsQuickCreateQuestionOpen(true)}
-                      className="px-2.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-1 shadow-xs"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>New Question</span>
-                    </button>
-                  </div>
+            {/* PART 2 (RIGHT): QUESTIONS ATTACHED TO THIS TEST */}
+            <div className="lg:col-span-6 flex flex-col min-h-0 bg-slate-50/70 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4 shrink-0">
+                <div>
+                  <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-indigo-600" />
+                    <span>Questions attached to this Test</span>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-100 text-indigo-700">
+                      {stagedQuestions.length}
+                    </span>
+                  </label>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Add questions from the Question Bank or draft new questions for this test.
+                  </p>
                 </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBankIdsToAdd(new Set());
+                      setBankSearchTerm('');
+                      setIsPickFromBankOpen(true);
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-lg flex items-center gap-1.5 shadow-2xs transition-colors"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    <span>Pick from Bank</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickCreateQuestionOpen(true)}
+                    className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>New Question</span>
+                  </button>
+                </div>
+              </div>
 
+              <div className="flex-1 min-h-0 overflow-y-auto pr-1">
                 {stagedQuestions.length > 0 ? (
-                  <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100 max-h-48 overflow-y-auto bg-gray-50">
+                  <div className="space-y-2.5">
                     {stagedQuestions.map((q, idx) => (
                       <div
                         key={q.id || `draft-${idx}`}
-                        className="p-2.5 bg-white flex items-start justify-between gap-3 hover:bg-gray-50/80 transition-colors"
+                        className="p-3.5 bg-white border border-gray-200 rounded-xl flex items-start justify-between gap-3 hover:border-indigo-300 transition-colors shadow-2xs"
                       >
-                        <div className="flex items-start gap-2 flex-1 min-w-0">
-                          <span className="w-5 h-5 rounded bg-indigo-50 text-indigo-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                        <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                          <span className="w-6 h-6 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5 border border-indigo-100">
                             {idx + 1}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 mb-0.5">
+                            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                               {q.is_new_draft && (
-                                <span className="px-1.5 py-0.2 rounded text-2xs font-bold bg-amber-100 text-amber-800">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
                                   Draft
                                 </span>
                               )}
                               <span
-                                className={`px-1.5 py-0.2 rounded text-2xs font-semibold uppercase ${
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${
                                   q.difficulty === 'Hard' || q.difficulty === 'hard'
                                     ? 'bg-rose-100 text-rose-700'
-                                    : 'bg-emerald-100 text-emerald-700'
+                                    : q.difficulty === 'Easy' || q.difficulty === 'easy'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : 'bg-amber-100 text-amber-700'
                                 }`}
                               >
                                 {q.difficulty || 'Medium'}
                               </span>
-                              <span className="text-2xs text-gray-500 font-medium">Marks: {q.marks || 1}</span>
-                              <span className="text-2xs text-gray-500 font-medium">Neg: -{q.negative_marks || 0}</span>
+                              <span className="text-[10px] text-gray-500 font-medium">
+                                Marks: {q.marks || 1}
+                              </span>
+                              <span className="text-[10px] text-gray-500 font-medium">
+                                Neg: -{q.negative_marks || 0}
+                              </span>
                             </div>
-                            <p className="text-xs font-medium text-gray-900 truncate">
+                            <p className="text-xs font-medium text-gray-900 leading-relaxed">
                               {q.question_text || q.question || q.text}
                             </p>
                           </div>
@@ -1832,7 +1889,7 @@ export default function TestsPage() {
                             updated.splice(idx, 1);
                             setStagedQuestions(updated);
                           }}
-                          className="p-1 text-gray-400 hover:text-rose-600 rounded"
+                          className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
                           title="Remove from test"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1841,37 +1898,39 @@ export default function TestsPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="border border-dashed border-gray-300 rounded-xl p-5 text-center bg-gray-50/50">
-                    <p className="text-xs font-semibold text-gray-700 mb-0.5">No questions attached yet</p>
-                    <p className="text-2xs text-gray-500">
-                      You can add questions now or auto-populate them after saving.
+                  <div className="h-full min-h-[260px] border-2 border-dashed border-gray-200 rounded-xl p-8 flex flex-col items-center justify-center text-center bg-white/70">
+                    <div className="w-11 h-11 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center mb-3">
+                      <HelpCircle className="w-5 h-5" />
+                    </div>
+                    <p className="text-xs font-semibold text-gray-800 mb-1">No questions attached yet</p>
+                    <p className="text-[11px] text-gray-500 max-w-xs mb-4">
+                      Use &ldquo;Pick from Bank&rdquo; or &ldquo;New Question&rdquo; above to attach questions directly to this test.
                     </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedBankIdsToAdd(new Set());
+                          setBankSearchTerm('');
+                          setIsPickFromBankOpen(true);
+                        }}
+                        className="px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1.5"
+                      >
+                        <Search className="w-3.5 h-3.5" /> Pick from Bank
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickCreateQuestionOpen(true)}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> New Question
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
-
-              {/* Modal Actions */}
-              <div className="pt-3 flex justify-end gap-3 border-t border-gray-100 mt-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreateOpen(false);
-                    setIsEditOpen(false);
-                  }}
-                  className="px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition-colors disabled:opacity-50 flex items-center gap-2 shadow-xs"
-                >
-                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  <span>{isEditOpen ? 'Save Changes' : 'Create Test'}</span>
-                </button>
-              </div>
-            </form>
+            </div>
+          </form>
           </div>
         </div>
       )}
