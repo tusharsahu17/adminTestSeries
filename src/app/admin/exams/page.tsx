@@ -43,6 +43,8 @@ export default function ExamsPage() {
   // Hierarchy state
   const [hierarchyData, setHierarchyData] = useState<any>(null);
   const [loadingHierarchy, setLoadingHierarchy] = useState(false);
+  const [hierarchySearch, setHierarchySearch] = useState('');
+  const [collapsedSubjectIds, setCollapsedSubjectIds] = useState<Set<string>>(new Set());
 
   // Form state (matches Step 1 Payload)
   const [form, setForm] = useState<{
@@ -240,6 +242,8 @@ export default function ExamsPage() {
   // View Hierarchy
   const openHierarchyModal = async (exam: any) => {
     setActiveExam(exam);
+    setHierarchySearch('');
+    setCollapsedSubjectIds(new Set());
     setIsHierarchyOpen(true);
     setLoadingHierarchy(true);
     try {
@@ -251,6 +255,16 @@ export default function ExamsPage() {
     } finally {
       setLoadingHierarchy(false);
     }
+  };
+
+  const toggleHierarchySubject = (subjectId: string | number) => {
+    const idStr = String(subjectId);
+    setCollapsedSubjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(idStr)) next.delete(idStr);
+      else next.add(idStr);
+      return next;
+    });
   };
 
   const filteredExams = exams.filter((e) => {
@@ -696,102 +710,312 @@ export default function ExamsPage() {
       )}
 
       {/* Modal for Full Hierarchy Viewer (GET /api/exams/:examId/hierarchy) */}
-      {isHierarchyOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full p-6 animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
-            <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
-              <div>
-                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <Network className="w-5 h-5 text-indigo-600" />
-                  Full Hierarchy for {activeExam?.name}
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Inspect mapped subjects, topics, subtopics, and practice test coverage.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsHierarchyOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {isHierarchyOpen && (() => {
+        const allHierarchySubjects: any[] = hierarchyData?.subjects || [];
+        const totalSubjectsCount = allHierarchySubjects.length;
+        const totalTopicsCount = allHierarchySubjects.reduce(
+          (acc, s) => acc + (s.topics?.length || 0),
+          0
+        );
+        const totalSubtopicsCount = allHierarchySubjects.reduce(
+          (acc, s) =>
+            acc +
+            (s.topics || []).reduce((tAcc: number, t: any) => tAcc + (t.subtopics?.length || 0), 0),
+          0
+        );
 
-            <div className="overflow-y-auto flex-1 pr-1 space-y-3">
-              {loadingHierarchy ? (
-                <div className="py-16 text-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500">Loading complete exam hierarchy...</p>
-                </div>
-              ) : !hierarchyData || !hierarchyData.subjects || hierarchyData.subjects.length === 0 ? (
-                <div className="text-center py-12 text-gray-500 text-xs">
-                  No subjects or topics mapped to this exam yet.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {hierarchyData.subjects.map((subj: any) => (
-                    <div key={subj.id} className="border border-gray-200 rounded-xl overflow-hidden">
-                      <div className="p-3 bg-indigo-50/50 flex items-center justify-between border-b border-gray-100">
-                        <div className="flex items-center gap-2">
-                          <Folder className="w-4 h-4 text-indigo-600" />
-                          <span className="text-xs font-bold text-gray-900">{subj.name}</span>
-                          <span className="text-2xs font-mono text-gray-400">#{subj.id}</span>
-                        </div>
-                        <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
-                          {subj.topics?.length || 0} topic(s)
+        const q = hierarchySearch.trim().toLowerCase();
+        const filteredHierarchySubjects = !q
+          ? allHierarchySubjects
+          : allHierarchySubjects
+              .map((subj) => {
+                const subjMatch = (subj.name || '').toLowerCase().includes(q);
+                const matchingTopics = (subj.topics || [])
+                  .map((top: any) => {
+                    const topMatch = (top.name || '').toLowerCase().includes(q);
+                    const matchingSubtopics = (top.subtopics || []).filter((st: any) =>
+                      (st.name || '').toLowerCase().includes(q)
+                    );
+                    if (topMatch || subjMatch) return top;
+                    if (matchingSubtopics.length > 0) {
+                      return { ...top, subtopics: matchingSubtopics };
+                    }
+                    return null;
+                  })
+                  .filter(Boolean);
+
+                if (subjMatch || matchingTopics.length > 0) {
+                  return {
+                    ...subj,
+                    topics: subjMatch && matchingTopics.length === 0 ? subj.topics || [] : matchingTopics,
+                  };
+                }
+                return null;
+              })
+              .filter(Boolean);
+
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4"
+            onClick={() => setIsHierarchyOpen(false)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl border border-gray-200/80 max-w-3xl w-full animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[88vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="px-6 py-4 bg-gradient-to-r from-indigo-50/90 via-sky-50/40 to-white border-b border-gray-200/80 flex items-center justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-200">
+                    <Network className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-bold text-gray-900">Exam Hierarchy</h3>
+                      {activeExam?.name && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200/70">
+                          {activeExam.name}
                         </span>
-                      </div>
-                      <div className="p-3 bg-white space-y-2">
-                        {subj.topics?.length === 0 ? (
-                          <p className="text-2xs text-gray-400 italic">No topics under this subject</p>
-                        ) : (
-                          subj.topics?.map((top: any) => (
-                            <div key={top.id} className="p-2.5 bg-gray-50 rounded-lg border border-gray-150">
-                              <div className="flex items-center justify-between mb-1">
-                                <div className="flex items-center gap-2">
-                                  <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                                  <span className="text-xs font-semibold text-gray-800">{top.name}</span>
-                                  <span className="text-2xs font-mono text-gray-400">#{top.id}</span>
-                                </div>
-                                <span className="text-2xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                  {top.subtopics?.length || 0} subtopics
-                                </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Interactive curriculum map across subjects, topics, and subtopics
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {!loadingHierarchy && totalSubjectsCount > 0 && (
+                    <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-medium">
+                      <span className="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200/70">
+                        {totalSubjectsCount} Subjects
+                      </span>
+                      <span className="px-2 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200/70">
+                        {totalTopicsCount} Topics
+                      </span>
+                      <span className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                        {totalSubtopicsCount} Subtopics
+                      </span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setIsHierarchyOpen(false)}
+                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Close"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Toolbar: Search + Expand/Collapse + Legend */}
+              {!loadingHierarchy && totalSubjectsCount > 0 && (
+                <div className="px-5 py-2.5 bg-white border-b border-gray-100 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+                  <div className="relative flex-1 min-w-[200px] max-w-xs">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Filter subjects, topics, subtopics..."
+                      value={hierarchySearch}
+                      onChange={(e) => setHierarchySearch(e.target.value)}
+                      className="w-full pl-8 pr-7 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-colors"
+                    />
+                    {hierarchySearch && (
+                      <button
+                        type="button"
+                        onClick={() => setHierarchySearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="hidden md:flex items-center gap-3 text-[10px] font-medium text-gray-500">
+                      <span className="inline-flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                        Subject
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-sky-500" />
+                        Topic
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        Subtopic
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 border-l border-gray-200 pl-3">
+                      <button
+                        type="button"
+                        onClick={() => setCollapsedSubjectIds(new Set())}
+                        className="px-2 py-1 text-[10px] font-medium text-gray-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors"
+                      >
+                        Expand All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCollapsedSubjectIds(
+                            new Set(allHierarchySubjects.map((s) => String(s.id)))
+                          )
+                        }
+                        className="px-2 py-1 text-[10px] font-medium text-gray-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors"
+                      >
+                        Collapse All
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Body */}
+              <div className="p-5 overflow-y-auto flex-1 bg-slate-50/70 space-y-3">
+                {loadingHierarchy ? (
+                  <div className="py-16 text-center">
+                    <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mx-auto mb-2.5" />
+                    <p className="text-xs text-gray-500 font-medium">Loading exam hierarchy...</p>
+                  </div>
+                ) : totalSubjectsCount === 0 ? (
+                  <div className="bg-white border border-dashed border-gray-200 rounded-xl py-12 px-6 text-center">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-2.5">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <p className="text-xs font-semibold text-gray-700">No Hierarchy Available</p>
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      No subjects or topics have been mapped to this exam yet.
+                    </p>
+                  </div>
+                ) : filteredHierarchySubjects.length === 0 ? (
+                  <div className="bg-white border border-dashed border-gray-200 rounded-xl py-10 px-6 text-center">
+                    <p className="text-xs font-semibold text-gray-700">No Matches Found</p>
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Nothing in this exam matches &ldquo;{hierarchySearch}&rdquo;.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredHierarchySubjects.map((subj: any) => {
+                      const topicCount = subj.topics?.length || 0;
+                      const isCollapsed = !q && collapsedSubjectIds.has(String(subj.id));
+
+                      return (
+                        <div
+                          key={subj.id}
+                          className="bg-white border border-indigo-200/80 border-l-4 border-l-indigo-500 rounded-xl overflow-hidden shadow-xs transition-all"
+                        >
+                          {/* Collapsible Subject Header */}
+                          <button
+                            type="button"
+                            onClick={() => toggleHierarchySubject(subj.id)}
+                            className="w-full px-4 py-2.5 bg-indigo-50/60 hover:bg-indigo-50/90 border-b border-indigo-100/80 flex items-center justify-between transition-colors text-left"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {isCollapsed ? (
+                                <ChevronRight className="w-4 h-4 text-indigo-400 shrink-0" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-indigo-600 shrink-0" />
+                              )}
+                              <div className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                <Folder className="w-3.5 h-3.5" />
                               </div>
-                              {top.subtopics?.length > 0 && (
-                                <div className="pl-5 pt-1.5 flex flex-wrap gap-1.5">
-                                  {top.subtopics.map((subtop: any) => (
-                                    <span
-                                      key={subtop.id}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs bg-white border border-gray-200 text-gray-700"
-                                    >
-                                      <Tag className="w-3 h-3 text-emerald-600" />
-                                      <span>{subtop.name}</span>
-                                      <span className="text-gray-400 text-3xs font-mono">#{subtop.id}</span>
-                                    </span>
-                                  ))}
+                              <span className="text-xs font-semibold text-indigo-950 truncate">
+                                {subj.name}
+                              </span>
+                              <span className="text-[10px] font-mono text-indigo-400 shrink-0">
+                                #{subj.id}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-indigo-100/80 text-indigo-700 border border-indigo-200/70 shrink-0">
+                              {topicCount} {topicCount === 1 ? 'topic' : 'topics'}
+                            </span>
+                          </button>
+
+                          {/* Topics Tree */}
+                          {!isCollapsed && (
+                            <div className="p-3.5 bg-white">
+                              {topicCount === 0 ? (
+                                <p className="text-[11px] text-gray-400 italic px-2 py-1">
+                                  No topics under this subject
+                                </p>
+                              ) : (
+                                <div className="border-l-2 border-indigo-200/70 ml-2.5 pl-3.5 space-y-2.5">
+                                  {subj.topics.map((top: any) => {
+                                    const subtopicCount = top.subtopics?.length || 0;
+                                    return (
+                                      <div
+                                        key={top.id}
+                                        className="relative p-2.5 bg-sky-50/45 rounded-lg border border-sky-200/80 border-l-4 border-l-sky-500"
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <div className="w-5 h-5 rounded bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+                                              <FileText className="w-3 h-3" />
+                                            </div>
+                                            <span className="text-xs font-medium text-sky-950 truncate">
+                                              {top.name}
+                                            </span>
+                                            <span className="text-[10px] font-mono text-sky-500/80 shrink-0">
+                                              #{top.id}
+                                            </span>
+                                          </div>
+                                          <span className="text-[10px] font-medium text-sky-700 bg-sky-100/80 px-2 py-0.5 rounded-full border border-sky-200/80 shrink-0">
+                                            {subtopicCount}{' '}
+                                            {subtopicCount === 1 ? 'subtopic' : 'subtopics'}
+                                          </span>
+                                        </div>
+
+                                        {/* Subtopics Branch */}
+                                        {subtopicCount > 0 && (
+                                          <div className="mt-2 ml-2.5 pl-3 border-l-2 border-sky-200/70 pt-1.5 flex flex-wrap gap-1.5">
+                                            {top.subtopics.map((subtop: any) => (
+                                              <span
+                                                key={subtop.id}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-50/90 border border-emerald-200/80 text-emerald-800 shadow-2xs"
+                                              >
+                                                <Tag className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                                                <span>{subtop.name}</span>
+                                                <span className="text-emerald-500/80 text-[9px] font-mono">
+                                                  #{subtop.id}
+                                                </span>
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
-            <div className="pt-4 mt-3 flex justify-end shrink-0 border-t border-gray-100">
-              <button
-                onClick={() => setIsHierarchyOpen(false)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors"
-              >
-                Close Hierarchy
-              </button>
+              {/* Footer */}
+              <div className="px-6 py-3 bg-white border-t border-gray-100 flex items-center justify-between shrink-0">
+                <span className="text-[11px] text-gray-500">
+                  {totalSubjectsCount > 0
+                    ? `Showing ${filteredHierarchySubjects.length} of ${totalSubjectsCount} subject(s)`
+                    : 'Exam hierarchy'}
+                </span>
+                <button
+                  onClick={() => setIsHierarchyOpen(false)}
+                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

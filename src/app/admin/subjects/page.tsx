@@ -301,6 +301,27 @@ export default function SubjectsPage() {
           </div>
         ) : (
           <div className="space-y-3">
+            {/* Color Legend */}
+            <div className="flex items-center justify-between px-1 pb-1">
+              <div className="flex items-center gap-4 text-[11px] font-medium text-gray-500">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                  Subject
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-sky-500" />
+                  Topic
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  Subtopic
+                </span>
+              </div>
+              <span className="text-[11px] text-gray-400">
+                {subjects.length} subject{subjects.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
             {subjects.map((subject) => {
               const subjectIdStr = String(subject.id);
               const isSubExpanded = !!expandedSubjects[subjectIdStr];
@@ -309,204 +330,232 @@ export default function SubjectsPage() {
               return (
                 <div
                   key={subject.id}
-                  className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs transition-all"
+                  className="border border-indigo-200/80 border-l-4 border-l-indigo-500 rounded-xl overflow-hidden shadow-xs bg-white transition-all"
                 >
-                  {/* LEVEL 1: SUBJECT HEADER */}
+                  {/* LEVEL 1: SUBJECT HEADER (Indigo) */}
                   <div
-                    className={`flex items-center justify-between p-4 cursor-pointer transition-colors ${
-                      isSubExpanded ? 'bg-indigo-50/40 border-b border-gray-200' : 'bg-gray-50 hover:bg-gray-100/80'
+                    className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors ${
+                      isSubExpanded
+                        ? 'bg-indigo-50/60 border-b border-indigo-100'
+                        : 'bg-white hover:bg-indigo-50/30'
                     }`}
                     onClick={() => toggleSubject(subjectIdStr)}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       {isSubExpanded ? (
-                        <ChevronDown className="w-5 h-5 text-indigo-600" />
+                        <ChevronDown className="w-4 h-4 text-indigo-600 shrink-0" />
                       ) : (
-                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                        <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
                       )}
-                      {isSubExpanded ? (
-                        <FolderOpen className="w-5 h-5 text-indigo-600" />
-                      ) : (
-                        <Folder className="w-5 h-5 text-indigo-500" />
-                      )}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-gray-900">{subject.name}</span>
-                          <span className="text-gray-400 text-xs font-mono">#{subject.id}</span>
+                      <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                        {isSubExpanded ? (
+                          <FolderOpen className="w-4 h-4" />
+                        ) : (
+                          <Folder className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-indigo-950 truncate">
+                            {subject.name}
+                          </span>
+                          <span className="text-indigo-400 text-[11px] font-mono">
+                            #{subject.id}
+                          </span>
                           {subjectTopics && (
-                            <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-indigo-100/80 text-indigo-700 border border-indigo-200/70">
                               {subjectTopics.length} topic{subjectTopics.length !== 1 ? 's' : ''}
                             </span>
                           )}
                         </div>
                         {subject.description && (
-                          <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{subject.description}</p>
+                          <p className="text-[11px] text-gray-500 line-clamp-1 mt-0.5">
+                            {subject.description}
+                          </p>
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2 items-center" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-1.5 items-center shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
-                        className="text-xs text-indigo-700 font-semibold px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center gap-1 transition-colors border border-indigo-200/50"
+                        className="text-[11px] text-indigo-700 font-medium px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center gap-1 transition-colors border border-indigo-200/60"
                         onClick={(e) => openCreateTopic(subjectIdStr, e)}
                       >
-                        <Plus className="w-3.5 h-3.5" /> Add Topic
+                        <Plus className="w-3 h-3" /> Add Topic
                       </button>
                       <button
                         onClick={(e) => openEditSubject(subject, e)}
-                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50/70 rounded-lg transition-colors"
                         title="Edit Subject"
                       >
-                        <Edit className="w-4 h-4" />
+                        <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={(e) => deleteSubject(subjectIdStr, e)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50/70 rounded-lg transition-colors"
                         title="Delete Subject"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
 
                   {/* LEVEL 2: TOPICS CONTAINER */}
                   {isSubExpanded && (
-                    <div className="p-4 bg-white pl-8 sm:pl-12 space-y-3">
+                    <div className="p-4 bg-slate-50/50">
                       {!subjectTopics ? (
-                        <div className="text-xs text-gray-500 flex items-center gap-2 py-2">
+                        <div className="text-xs text-gray-500 flex items-center gap-2 py-2 pl-2">
                           <Loader2 className="w-4 h-4 animate-spin text-indigo-600" /> Loading topics...
                         </div>
                       ) : subjectTopics.length === 0 ? (
-                        <div className="text-xs text-gray-500 italic py-2 flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 text-gray-400" />
+                        <div className="text-xs text-gray-500 italic py-3 px-4 bg-white border border-dashed border-gray-200 rounded-lg flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-gray-400 shrink-0" />
                           No topics found under this subject yet. Click &quot;+ Add Topic&quot; above to create one.
                         </div>
                       ) : (
-                        subjectTopics.map((topic) => {
-                          const topicIdStr = String(topic.id);
-                          const isTopicExpanded = !!expandedTopics[topicIdStr];
-                          const topicSubtopics = subtopics[topicIdStr];
+                        <div className="border-l-2 border-indigo-200/80 ml-3 pl-4 space-y-2.5">
+                          {subjectTopics.map((topic) => {
+                            const topicIdStr = String(topic.id);
+                            const isTopicExpanded = !!expandedTopics[topicIdStr];
+                            const topicSubtopics = subtopics[topicIdStr];
 
-                          return (
-                            <div
-                              key={topic.id}
-                              className="border border-gray-150 rounded-lg overflow-hidden bg-white shadow-2xs"
-                            >
-                              {/* TOPIC HEADER ROW */}
+                            return (
                               <div
-                                className="flex items-center justify-between p-3 bg-gray-50/70 hover:bg-gray-100/80 cursor-pointer transition-colors"
-                                onClick={(e) => toggleTopic(topicIdStr, e)}
+                                key={topic.id}
+                                className="border border-sky-200/80 border-l-4 border-l-sky-500 rounded-xl overflow-hidden bg-white shadow-2xs"
                               >
-                                <div className="flex items-center gap-2.5">
-                                  {isTopicExpanded ? (
-                                    <ChevronDown className="w-4 h-4 text-indigo-500" />
-                                  ) : (
-                                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                                  )}
-                                  <FileText className="w-4 h-4 text-indigo-600" />
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-semibold text-gray-900">{topic.name}</span>
-                                      <span className="text-gray-400 text-xs font-mono">#{topic.id}</span>
-                                      {topic.is_active === false && (
-                                        <span className="text-2xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
-                                          Inactive
+                                {/* TOPIC HEADER ROW (Sky) */}
+                                <div
+                                  className={`flex items-center justify-between px-3.5 py-2.5 cursor-pointer transition-colors ${
+                                    isTopicExpanded
+                                      ? 'bg-sky-50/60 border-b border-sky-100'
+                                      : 'bg-sky-50/30 hover:bg-sky-50/60'
+                                  }`}
+                                  onClick={(e) => toggleTopic(topicIdStr, e)}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    {isTopicExpanded ? (
+                                      <ChevronDown className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                    ) : (
+                                      <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                    )}
+                                    <div className="w-6 h-6 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+                                      <FileText className="w-3.5 h-3.5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-xs font-semibold text-sky-950 truncate">
+                                          {topic.name}
                                         </span>
-                                      )}
-                                      {topicSubtopics && (
-                                        <span className="text-2xs font-medium px-2 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
-                                          {topicSubtopics.length} subtopic{topicSubtopics.length !== 1 ? 's' : ''}
+                                        <span className="text-sky-500/80 text-[10px] font-mono">
+                                          #{topic.id}
                                         </span>
+                                        {topic.is_active === false && (
+                                          <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
+                                            Inactive
+                                          </span>
+                                        )}
+                                        {topicSubtopics && (
+                                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-sky-100/80 text-sky-700 border border-sky-200/70">
+                                            {topicSubtopics.length} subtopic{topicSubtopics.length !== 1 ? 's' : ''}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {topic.description && (
+                                        <p className="text-[11px] text-gray-500 line-clamp-1 mt-0.5">
+                                          {topic.description}
+                                        </p>
                                       )}
                                     </div>
-                                    {topic.description && (
-                                      <p className="text-2xs text-gray-500 line-clamp-1">{topic.description}</p>
-                                    )}
+                                  </div>
+                                  <div className="flex gap-1 items-center shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      onClick={(e) => openCreateSubtopic(topicIdStr, e)}
+                                      className="text-[10px] text-emerald-700 font-medium px-2 py-1 bg-emerald-50 hover:bg-emerald-100 rounded-md border border-emerald-200/70 flex items-center gap-1 transition-colors"
+                                    >
+                                      <Plus className="w-3 h-3" /> Add Subtopic
+                                    </button>
+                                    <button
+                                      onClick={(e) => openEditTopic(subjectIdStr, topic, e)}
+                                      className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-white rounded-md transition-colors"
+                                      title="Edit Topic"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => deleteTopic(subjectIdStr, topicIdStr, e)}
+                                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-white rounded-md transition-colors"
+                                      title="Delete Topic"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                   </div>
                                 </div>
-                                <div className="flex gap-1.5 items-center" onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    onClick={(e) => openCreateSubtopic(topicIdStr, e)}
-                                    className="text-2xs text-emerald-700 font-semibold px-2 py-1 bg-emerald-50 hover:bg-emerald-100 rounded-md border border-emerald-200/60 flex items-center gap-1 transition-colors"
-                                  >
-                                    <Plus className="w-3 h-3" /> Add Subtopic
-                                  </button>
-                                  <button
-                                    onClick={(e) => openEditTopic(subjectIdStr, topic, e)}
-                                    className="p-1 text-gray-400 hover:text-indigo-600 rounded transition-colors"
-                                    title="Edit Topic"
-                                  >
-                                    <Edit className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => deleteTopic(subjectIdStr, topicIdStr, e)}
-                                    className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors"
-                                    title="Delete Topic"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
 
-                              {/* LEVEL 3: SUBTOPICS LIST */}
-                              {isTopicExpanded && (
-                                <div className="p-3 bg-gray-50/30 pl-8 space-y-2 border-t border-gray-100">
-                                  {!topicSubtopics ? (
-                                    <div className="text-2xs text-gray-500 flex items-center gap-1.5 py-1">
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
-                                      Loading subtopics...
-                                    </div>
-                                  ) : topicSubtopics.length === 0 ? (
-                                    <div className="text-2xs text-gray-400 italic py-1">
-                                      No subtopics under this topic. Click &quot;+ Add Subtopic&quot; to create one.
-                                    </div>
-                                  ) : (
-                                    topicSubtopics.map((subtopic) => (
-                                      <div
-                                        key={subtopic.id}
-                                        className="flex items-center justify-between p-2.5 bg-white border border-gray-200 rounded-lg hover:border-emerald-300 transition-colors"
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          <Tag className="w-3.5 h-3.5 text-emerald-600" />
-                                          <div>
-                                            <span className="text-xs font-medium text-gray-800">
-                                              {subtopic.name}
-                                            </span>
-                                            <span className="text-gray-400 text-2xs font-mono ml-1.5">
-                                              #{subtopic.id}
-                                            </span>
-                                            {subtopic.description && (
-                                              <p className="text-2xs text-gray-500 line-clamp-1">
-                                                {subtopic.description}
-                                              </p>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <div className="flex gap-1 items-center">
-                                          <button
-                                            onClick={(e) => openEditSubtopic(topicIdStr, subtopic, e)}
-                                            className="p-1 text-gray-400 hover:text-emerald-600 rounded"
-                                            title="Edit Subtopic"
-                                          >
-                                            <Edit className="w-3.5 h-3.5" />
-                                          </button>
-                                          <button
-                                            onClick={(e) =>
-                                              deleteSubtopic(topicIdStr, String(subtopic.id), e)
-                                            }
-                                            className="p-1 text-gray-400 hover:text-red-600 rounded"
-                                            title="Delete Subtopic"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                          </button>
-                                        </div>
+                                {/* LEVEL 3: SUBTOPICS LIST (Emerald) */}
+                                {isTopicExpanded && (
+                                  <div className="p-3 bg-white">
+                                    {!topicSubtopics ? (
+                                      <div className="text-[11px] text-gray-500 flex items-center gap-1.5 py-1 pl-2">
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                                        Loading subtopics...
                                       </div>
-                                    ))
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
+                                    ) : topicSubtopics.length === 0 ? (
+                                      <div className="text-[11px] text-gray-400 italic py-1.5 px-2">
+                                        No subtopics under this topic. Click &quot;+ Add Subtopic&quot; to create one.
+                                      </div>
+                                    ) : (
+                                      <div className="border-l-2 border-sky-200/80 ml-3 pl-3.5 space-y-1.5">
+                                        {topicSubtopics.map((subtopic) => (
+                                          <div
+                                            key={subtopic.id}
+                                            className="flex items-center justify-between px-3 py-2 bg-emerald-50/45 border border-emerald-200/80 rounded-lg hover:bg-emerald-50/80 hover:border-emerald-300 transition-colors"
+                                          >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                              <Tag className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                              <div className="min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                  <span className="text-xs font-medium text-emerald-950 truncate">
+                                                    {subtopic.name}
+                                                  </span>
+                                                  <span className="text-emerald-600/70 text-[10px] font-mono shrink-0">
+                                                    #{subtopic.id}
+                                                  </span>
+                                                </div>
+                                                {subtopic.description && (
+                                                  <p className="text-[11px] text-gray-500 line-clamp-1">
+                                                    {subtopic.description}
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </div>
+                                            <div className="flex gap-1 items-center shrink-0">
+                                              <button
+                                                onClick={(e) => openEditSubtopic(topicIdStr, subtopic, e)}
+                                                className="p-1 text-gray-400 hover:text-emerald-700 hover:bg-white rounded transition-colors"
+                                                title="Edit Subtopic"
+                                              >
+                                                <Edit className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button
+                                                onClick={(e) =>
+                                                  deleteSubtopic(topicIdStr, String(subtopic.id), e)
+                                                }
+                                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-white rounded transition-colors"
+                                                title="Delete Subtopic"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   )}

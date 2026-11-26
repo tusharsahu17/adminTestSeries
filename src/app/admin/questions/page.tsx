@@ -444,7 +444,7 @@ export default function QuestionsPage() {
           <div className="flex flex-wrap items-center gap-2">
             {/* Subject Filter */}
             <div className="flex items-center gap-1">
-              <span className="text-2xs font-semibold text-gray-500">Subject:</span>
+              {/* <span className="text-2xs font-semibold text-gray-500">Subject:</span> */}
               <select
                 value={selectedSubjectFilter}
                 onChange={(e) => {
@@ -485,7 +485,7 @@ export default function QuestionsPage() {
 
             {/* Test Filter */}
             <div className="flex items-center gap-1">
-              <span className="text-2xs font-semibold text-gray-500">Test:</span>
+              {/* <span className="text-2xs font-semibold text-gray-500">Test:</span> */}
               <select
                 value={selectedTestFilter}
                 onChange={(e) => setSelectedTestFilter(e.target.value)}
@@ -502,7 +502,7 @@ export default function QuestionsPage() {
 
             {/* Difficulty Filter */}
             <div className="flex items-center gap-1">
-              <span className="text-2xs font-semibold text-gray-500">Diff:</span>
+              {/* <span className="text-2xs font-semibold text-gray-500">Diff:</span> */}
               <select
                 value={selectedDifficultyFilter}
                 onChange={(e) => setSelectedDifficultyFilter(e.target.value)}
@@ -567,7 +567,7 @@ export default function QuestionsPage() {
                     <td className="py-3 px-5 text-xs font-mono text-gray-500">#{q.id}</td>
                     <td className="py-3 px-5">
                       <div className="flex items-start gap-2.5 max-w-md">
-                        <HelpCircle className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
+                        {/* <HelpCircle className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" /> */}
                         <div>
                           <p className="font-semibold text-gray-900 text-xs line-clamp-2">
                             {q.question_text || q.text || q.question}
@@ -613,7 +613,7 @@ export default function QuestionsPage() {
                     </td>
                     <td className="py-3 px-5">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-2xs font-semibold uppercase ${
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${
                           q.difficulty === 'hard' || q.difficulty === 'Hard'
                             ? 'bg-rose-100 text-rose-700'
                             : q.difficulty === 'medium' || q.difficulty === 'Medium'
